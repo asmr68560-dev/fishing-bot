@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# fishing_bot.py - Полный бот для рыбалки с системой банов
+# fishing_bot_webhook.py - Бот для рыбалки с Webhook для Render
 import os
 import telebot
 from telebot import types
@@ -9,20 +9,17 @@ import random
 import re
 import threading
 from datetime import datetime
-from flask import Flask
+from flask import Flask, request
 
 app = Flask(__name__)
 
-@app.route('/')
-def home():
-    return "🎣 Fishing Bot is running!", 200
-
-@app.route('/health')
-def health():
-    return "OK", 200
-
+# ========== КОНФИГУРАЦИЯ ==========
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8377535372:AAGLMfn_0P_tDvpJnfv_NmW4QclM2AIojEA')
-bot = telebot.TeleBot(BOT_TOKEN, threaded=True)
+bot = telebot.TeleBot(BOT_TOKEN)
+
+# Получаем URL от Render
+RENDER_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
+WEBHOOK_URL = f'{RENDER_URL}/{BOT_TOKEN}' if RENDER_URL else None
 
 # Настройки игры
 INITIAL_WORMS = 10
@@ -75,16 +72,40 @@ RARITY_PROBABILITIES = {
     "мусор": 1
 }
 
-# Регулярные выражения для поиска ссылок
+# Регулярные выражения
 URL_PATTERN = re.compile(
     r'(https?://[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.(com|ru|net|org|info|io|me|tv|co|us|uk|de|fr|es|it|jp|cn|рф)[^\s]*)|(t\.me/[^\s]+)|(telegram\.me/[^\s]+)|(tg://[^\s]+)'
 )
 USERNAME_PATTERN = re.compile(r'@[a-zA-Z0-9_]{5,32}')
 
+# ========== БАЗА ДАННЫХ ==========
 class UserDatabase:
     def __init__(self):
         self.users = {}
         self.active_fishing = {}
+        self.load_data()
+    
+    def load_data(self):
+        """Загружаем данные из файла (если есть)"""
+        try:
+            with open('users_data.json', 'r', encoding='utf-8') as f:
+                self.users = json.load(f)
+                print(f"✅ Загружено {len(self.users)} пользователей")
+        except FileNotFoundError:
+            print("📁 Файл данных не найден, начинаем с чистого листа")
+            self.users = {}
+        except Exception as e:
+            print(f"⚠️ Ошибка загрузки данных: {e}")
+            self.users = {}
+    
+    def save_data(self):
+        """Сохраняем данные в файл"""
+        try:
+            with open('users_data.json', 'w', encoding='utf-8') as f:
+                json.dump(self.users, f, ensure_ascii=False, indent=2)
+            print("💾 Данные сохранены")
+        except Exception as e:
+            print(f"❌ Ошибка сохранения: {e}")
     
     def get_user(self, user_id):
         user_id = str(user_id)
@@ -121,6 +142,7 @@ class UserDatabase:
         user = self.get_user(user_id)
         if user['worms'] > 0:
             user['worms'] -= 1
+            self.save_data()
             return True, user['worms']
         return False, user['worms']
     
@@ -154,6 +176,7 @@ class UserDatabase:
             user['stats']['trash'] += 1
         
         user['last_fishing_time'] = time.time()
+        self.save_data()
         return catch
     
     def add_warning(self, user_id, chat_id=None):
@@ -166,8 +189,10 @@ class UserDatabase:
         
         if len(active_warnings) >= 2:
             user['banned_until'] = current_time + BAN_DURATION
+            self.save_data()
             return True, len(active_warnings), True
         
+        self.save_data()
         return False, len(active_warnings), False
     
     def is_banned(self, user_id):
@@ -178,6 +203,7 @@ class UserDatabase:
                 return True
             else:
                 user['banned_until'] = None
+                self.save_data()
                 return False
         return False
     
@@ -197,6 +223,7 @@ class UserDatabase:
 
 db = UserDatabase()
 
+# ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 def calculate_catch():
     total_prob = sum(RARITY_PROBABILITIES.values())
     rand_num = random.randint(1, total_prob)
@@ -232,36 +259,12 @@ def create_fishing_keyboard():
 
 def ban_user_in_group(chat_id, user_id, user_name):
     try:
-        # Пытаемся забанить
         bot.ban_chat_member(chat_id, user_id, until_date=int(time.time()) + BAN_DURATION)
-        
-        # Пытаемся создать ссылку-приглашение
-        try:
-            chat_invite = bot.create_chat_invite_link(
-                chat_id,
-                name=f"Возврат для {user_name}",
-                expire_date=int(time.time()) + BAN_DURATION + 86400,
-                member_limit=1
-            )
-            invite_link = chat_invite.invite_link
-            
-            ban_message = (
-                f"🚫 {user_name} забанен на 2 дня!\n"
-                f"⚠️ Причина: 2 ссылки за 24 часа\n"
-                f"🔗 Ссылка для возврата:\n{invite_link}\n"
-                f"📝 Ссылка действует 3 дня"
-            )
-        except:
-            ban_message = (
-                f"🚫 {user_name} забанен на 2 дня!\n"
-                f"⚠️ Причина: 2 ссылки за 24 часа"
-            )
-        
+        ban_message = f"🚫 {user_name} забанен на 2 дня!\n⚠️ Причина: 2 ссылки за 24 часа"
         bot.send_message(chat_id, ban_message)
         return True
     except Exception as e:
         print(f"Ошибка бана: {e}")
-        # Если не удалось забанить (нет прав), просто отправляем сообщение
         try:
             ban_message = f"🚫 {user_name} получил бан на 2 дня! Причина: 2 ссылки за 24 часа"
             bot.send_message(chat_id, ban_message)
@@ -291,7 +294,6 @@ def delete_links_in_group(message):
                     user_id = str(user.id)
                     chat_id = message.chat.id
                     
-                    # Проверяем бан
                     if db.is_banned(user_id):
                         ban_time_left = db.get_ban_time_left(user_id)
                         days_left = int(ban_time_left // 86400)
@@ -300,28 +302,21 @@ def delete_links_in_group(message):
                         
                         ban_message = (
                             f"🚫 {user.first_name}, ты уже забанен!\n"
-                            f"⏳ Бан истечет через: {days_left}д {hours_left}ч {minutes_left}мин\n"
-                            f"📝 Причина: отправка ссылок"
+                            f"⏳ Бан истечет через: {days_left}д {hours_left}ч {minutes_left}мин"
                         )
                         bot.send_message(chat_id, ban_message)
                         return True
                     
-                    # Удаляем сообщение
                     bot.delete_message(chat_id, message.message_id)
-                    
-                    # Добавляем предупреждение
                     banned, warning_count, is_ban = db.add_warning(user_id, chat_id)
                     
                     if is_ban:
-                        # Бан на 2 дня
                         ban_user_in_group(chat_id, user.id, user.first_name)
                     else:
-                        # Только предупреждение
                         warning_message = (
                             f"⚠️ {user.first_name}, даю предупреждение!\n"
                             f"На 2 раз даю бан, не кидай ссылки\n"
-                            f"📊 Предупреждений: {warning_count}/2\n"
-                            f"⏳ Предупреждение снимется через 24 часа"
+                            f"📊 Предупреждений: {warning_count}/2"
                         )
                         bot.send_message(chat_id, warning_message)
                     
@@ -330,6 +325,7 @@ def delete_links_in_group(message):
                 return True
     return False
 
+# ========== ОБРАБОТЧИКИ КОМАНД ==========
 @bot.message_handler(commands=['start'])
 def start_command(message):
     user = message.from_user
@@ -344,7 +340,6 @@ def start_command(message):
         ban_text = (
             f"🚫 {user.first_name}, ты забанен!\n\n"
             f"⏳ Бан истечет через: {days_left}д {hours_left}ч {minutes_left}мин\n"
-            f"📝 Причина: отправка ссылок\n\n"
             f"Ожидайте окончания бана для продолжения игры."
         )
         bot.send_message(message.chat.id, ban_text)
@@ -355,23 +350,14 @@ def start_command(message):
         f"Добро пожаловать в мир рыбалки!\n\n"
         f"🐛 Червяков: {user_data['worms']}/10\n"
         f"🐟 Всего поймано: {user_data['total_fish']}\n\n"
-        f"♻️ Червяки теперь пополняются каждые 15 минут!\n\n"
-        f"Используй кнопки ниже или команды:\n"
-        f"/fishing - Начать рыбалку\n"
-        f"/stats - Статистика\n"
-        f"/inventory - Инвентарь\n"
-        f"/help - Помощь\n\n"
-        f"При желании можете отблагодарить: 2200702034105283"
+        f"♻️ Червяки пополняются каждые 15 минут!\n\n"
+        f"Используй кнопки ниже для игры!"
     )
     
     bot.send_message(message.chat.id, welcome_text, reply_markup=create_main_keyboard())
 
 @bot.message_handler(commands=['help'])
 def help_command(message):
-    user = message.from_user
-    if db.is_banned(str(user.id)):
-        return
-    
     help_text = (
         "🎣 *Помощь по игре \"Рыбалка\"*\n\n"
         "📋 *Основные команды:*\n"
@@ -383,23 +369,11 @@ def help_command(message):
         "🎮 *Как играть:*\n"
         "1️⃣ У вас есть червяки 🐛 (макс. 10)\n"
         "2️⃣ Каждая рыбалка тратит 1 червяка\n"
-        "3️⃣ Червяки восстанавливаются (1 каждые 15 минут) ♻️\n"
+        "3️⃣ Червяки восстанавливаются (1 каждые 15 минут)\n"
         "4️⃣ Рыбалка длится 30 секунд\n"
         "5️⃣ Можно поймать рыбу разной редкости!\n\n"
-        "🐟 *Редкости рыбы:*\n"
-        "• 🐟 Обычная (50%)\n"
-        "• 🐠 Редкая (30%)\n"
-        "• 🌟 Эпическая (15%)\n"
-        "• 👑 Легендарная (4%)\n"
-        "• 🗑️ Мусор (1%)\n\n"
-        "⚖️ *Правила чата (в группах):*\n"
-        "• Запрещены любые ссылки (кроме @username)\n"
-        "• 1 ссылка = предупреждение\n"
-        "• 2 ссылки за 24 часа = бан на 2 дня в группе\n"
-        "• @username разрешены\n\n"
         "Удачи на рыбалке! 🎣"
     )
-    
     bot.send_message(message.chat.id, help_text, reply_markup=create_main_keyboard())
 
 @bot.message_handler(commands=['stats'])
@@ -430,11 +404,8 @@ def stats_command(message):
         f"• 🌟 Эпических: {user_data['stats']['epic']}\n"
         f"• 👑 Легендарных: {user_data['stats']['legendary']}\n"
         f"• 🗑️ Мусора: {user_data['stats']['trash']}\n\n"
-        f"🎯 *Эффективность:*\n"
-        f"Удача: {luck_rate:.1f}%\n"
-        f"Мусор: {trash_rate:.1f}%"
+        f"🎯 Удача: {luck_rate:.1f}% | Мусор: {trash_rate:.1f}%"
     )
-    
     bot.send_message(message.chat.id, stats_text, reply_markup=create_main_keyboard())
 
 @bot.message_handler(commands=['inventory'])
@@ -461,7 +432,6 @@ def fishing_command_handler(message):
     if db.is_banned(str(user.id)):
         return
     
-    # Проверяем ссылки в группе
     if delete_links_in_group(message):
         return
     
@@ -483,12 +453,12 @@ def fishing_command_handler(message):
             seconds = int(next_worm_in % 60)
             bot.send_message(message.chat.id,
                            f"😔 Червяки закончились!\n"
-                           f"Следующий червяк через: {minutes} мин {seconds} сек\n"
-                           f"♻️ Червяки пополняются каждые 15 минут.",
+                           f"Следующий червяк через: {minutes} мин {seconds} сек",
                            reply_markup=create_main_keyboard())
         else:
             user_data['worms'] = min(user_data['worms'] + 1, MAX_WORMS)
             user_data['last_worm_refill'] = current_time
+            db.save_data()
             bot.send_message(message.chat.id,
                            f"🎉 Червяки пополнились! Теперь у вас {user_data['worms']} червяков.",
                            reply_markup=create_main_keyboard())
@@ -549,6 +519,7 @@ def fishing_command_handler(message):
     db.active_fishing[user_id].daemon = True
     db.active_fishing[user_id].start()
 
+# ========== ОБРАБОТЧИКИ КНОПОК ==========
 @bot.message_handler(func=lambda msg: msg.text == '🎣 Начать рыбалку')
 def fishing_button_handler(message):
     fishing_command_handler(message)
@@ -573,7 +544,56 @@ def help_button_handler(message):
 def menu_command(message):
     bot.send_message(message.chat.id, "Возвращаю в главное меню:", reply_markup=create_main_keyboard())
 
-# Обработчик всех сообщений для проверки ссылок
+# ========== WEBHOOK РОУТЫ ==========
+@app.route(f'/{BOT_TOKEN}', methods=['POST'])
+def webhook():
+    """Основной endpoint для получения обновлений от Telegram"""
+    if request.headers.get('content-type') == 'application/json':
+        json_string = request.get_data().decode('utf-8')
+        update = telebot.types.Update.de_json(json_string)
+        bot.process_new_updates([update])
+        return 'ok', 200
+    return 'error', 403
+
+@app.route('/')
+def home():
+    return "🎣 Fishing Bot is running! Use /set_webhook to configure", 200
+
+@app.route('/set_webhook', methods=['GET'])
+def set_webhook():
+    """Установка webhook (вызовите этот URL один раз)"""
+    if not WEBHOOK_URL:
+        return "❌ RENDER_EXTERNAL_URL не настроен", 500
+    
+    try:
+        # Удаляем старый webhook
+        bot.remove_webhook()
+        time.sleep(0.1)
+        
+        # Устанавливаем новый
+        s = bot.set_webhook(url=WEBHOOK_URL)
+        
+        if s:
+            return f"✅ Webhook установлен!\nURL: {WEBHOOK_URL}", 200
+        else:
+            return "❌ Ошибка установки webhook", 500
+    except Exception as e:
+        return f"❌ Ошибка: {str(e)}", 500
+
+@app.route('/remove_webhook', methods=['GET'])
+def remove_webhook():
+    """Удаление webhook (если нужно перейти на polling)"""
+    try:
+        bot.remove_webhook()
+        return "✅ Webhook удален", 200
+    except Exception as e:
+        return f"❌ Ошибка: {str(e)}", 500
+
+@app.route('/health')
+def health():
+    return "OK", 200
+
+# ========== ОБРАБОТКА ВСЕХ СООБЩЕНИЙ ==========
 @bot.message_handler(func=lambda message: True, content_types=['text'])
 def handle_all_messages(message):
     delete_links_in_group(message)
@@ -588,18 +608,14 @@ def handle_all_messages(message):
 def handle_media_messages(message):
     delete_links_in_group(message)
 
-def run_flask():
+# ========== ЗАПУСК ПРИЛОЖЕНИЯ ==========
+if __name__ == '__main__':
+    print("=" * 50)
+    print("🎣 Fishing Bot Webhook Edition")
+    print(f"✅ Webhook URL: {WEBHOOK_URL if WEBHOOK_URL else 'Не настроен'}")
+    print(f"✅ Бот загружен: @{bot.get_me().username}")
+    print("=" * 50)
+    
+    # Запускаем Flask
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
-
-def run_bot():
-    print("🎣 Бот запущен со всеми функциями!")
-    print("✅ Игра 'Рыбалка' с 30 видами рыб")
-    print("✅ Система банов за ссылки в группах")
-    print("✅ Червяки пополняются каждые 15 минут")
-    bot.polling(none_stop=True)
-
-if __name__ == "__main__":
-    threading.Thread(target=run_flask, daemon=True).start()
-    time.sleep(2)
-    run_bot()
