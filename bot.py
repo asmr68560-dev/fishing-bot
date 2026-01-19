@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# fishing_bot_webhook.py - Бот для рыбалки с Webhook для Render
+# bot.py - Полный бот с keep-alive для Render
 import os
 import telebot
 from telebot import types
@@ -8,12 +8,86 @@ import time
 import random
 import re
 import threading
+import requests
 from datetime import datetime
 from flask import Flask, request
 
 app = Flask(__name__)
 
-# ========== КОНФИГУРАЦИЯ ==========
+# ========== KEEP-ALIVE SYSTEM ==========
+class KeepAliveService:
+    """Сервис для поддержания бота в активном состоянии на Render"""
+    
+    def __init__(self, base_url):
+        self.base_url = base_url
+        self.running = False
+        self.thread = None
+        self.ping_interval = 480  # 8 минут (меньше 15 мин сна Render)
+        
+    def start(self):
+        """Запускаем keep-alive в фоновом режиме"""
+        if self.running:
+            return
+            
+        self.running = True
+        self.thread = threading.Thread(target=self._ping_loop, daemon=True)
+        self.thread.start()
+        print(f"✅ Keep-alive запущен. Ping каждые {self.ping_interval//60} минут")
+        
+    def stop(self):
+        """Останавливаем keep-alive"""
+        self.running = False
+        if self.thread:
+            self.thread.join(timeout=2)
+            
+    def _ping_loop(self):
+        """Основной цикл пингов"""
+        ping_count = 0
+        
+        # Первый пинг сразу при старте
+        self._send_ping()
+        ping_count += 1
+        
+        while self.running:
+            try:
+                # Ждем указанный интервал
+                time.sleep(self.ping_interval)
+                
+                if self.running:
+                    self._send_ping()
+                    ping_count += 1
+                    
+                    # Логируем каждые 10 пингов
+                    if ping_count % 10 == 0:
+                        print(f"📊 Keep-alive: отправлено {ping_count} пингов")
+                        
+            except Exception as e:
+                print(f"⚠️ Ошибка в keep-alive: {e}")
+                
+    def _send_ping(self):
+        """Отправляем ping запрос"""
+        try:
+            start_time = time.time()
+            response = requests.get(
+                f"{self.base_url}/health",
+                timeout=10,
+                headers={'User-Agent': 'KeepAlive/1.0'}
+            )
+            elapsed = time.time() - start_time
+            
+            if response.status_code == 200:
+                print(f"🔄 Ping успешен: {response.text.strip()} ({elapsed:.1f} сек)")
+            else:
+                print(f"⚠️ Ping ошибка: {response.status_code}")
+                
+        except requests.exceptions.Timeout:
+            print("⏰ Ping timeout (10 сек)")
+        except requests.exceptions.ConnectionError:
+            print("🔌 Ошибка соединения")
+        except Exception as e:
+            print(f"❌ Ошибка ping: {type(e).__name__}")
+
+# ========== CONFIGURATION ==========
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8377535372:AAGLMfn_0P_tDvpJnfv_NmW4QclM2AIojEA')
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -21,7 +95,7 @@ bot = telebot.TeleBot(BOT_TOKEN)
 RENDER_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
 WEBHOOK_URL = f'{RENDER_URL}/{BOT_TOKEN}' if RENDER_URL else None
 
-# Настройки игры
+# Настройки игры (БЕЗ ИЗМЕНЕНИЙ!)
 INITIAL_WORMS = 10
 MAX_WORMS = 10
 FISHING_TIME = 30
@@ -29,7 +103,7 @@ WORM_REFILL_TIME = 900  # 15 минут
 WARNING_EXPIRE_TIME = 86400  # 24 часа
 BAN_DURATION = 172800  # 2 дня
 
-# Список рыб (30 видов)
+# Список рыб (30 видов) - БЕЗ ИЗМЕНЕНИЙ!
 FISHES = [
     {"name": "🐟 Пескарь", "rarity": "обычная", "weight": "100-300г", "emoji": "🐟"},
     {"name": "🐟 Окунь", "rarity": "обычная", "weight": "200-500г", "emoji": "🐟"},
@@ -63,7 +137,7 @@ FISHES = [
     {"name": "🌿 Водоросли", "rarity": "мусор", "weight": "100-300г", "emoji": "🌿"}
 ]
 
-# Редкости и их вероятности
+# Редкости и их вероятности - БЕЗ ИЗМЕНЕНИЙ!
 RARITY_PROBABILITIES = {
     "обычная": 50,
     "редкая": 30,
@@ -72,13 +146,13 @@ RARITY_PROBABILITIES = {
     "мусор": 1
 }
 
-# Регулярные выражения
+# Регулярные выражения - БЕЗ ИЗМЕНЕНИЙ!
 URL_PATTERN = re.compile(
     r'(https?://[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.(com|ru|net|org|info|io|me|tv|co|us|uk|de|fr|es|it|jp|cn|рф)[^\s]*)|(t\.me/[^\s]+)|(telegram\.me/[^\s]+)|(tg://[^\s]+)'
 )
 USERNAME_PATTERN = re.compile(r'@[a-zA-Z0-9_]{5,32}')
 
-# ========== БАЗА ДАННЫХ ==========
+# ========== USER DATABASE (БЕЗ ИЗМЕНЕНИЙ!) ==========
 class UserDatabase:
     def __init__(self):
         self.users = {}
@@ -90,7 +164,7 @@ class UserDatabase:
         try:
             with open('users_data.json', 'r', encoding='utf-8') as f:
                 self.users = json.load(f)
-                print(f"✅ Загружено {len(self.users)} пользователей")
+            print(f"✅ Загружено {len(self.users)} пользователей")
         except FileNotFoundError:
             print("📁 Файл данных не найден, начинаем с чистого листа")
             self.users = {}
@@ -223,7 +297,7 @@ class UserDatabase:
 
 db = UserDatabase()
 
-# ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+# ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ (БЕЗ ИЗМЕНЕНИЙ!) ==========
 def calculate_catch():
     total_prob = sum(RARITY_PROBABILITIES.values())
     rand_num = random.randint(1, total_prob)
@@ -325,7 +399,7 @@ def delete_links_in_group(message):
                 return True
     return False
 
-# ========== ОБРАБОТЧИКИ КОМАНД ==========
+# ========== ОБРАБОТЧИКИ КОМАНД С ДОБАВЛЕНИЕМ НОМЕРА КАРТЫ ==========
 @bot.message_handler(commands=['start'])
 def start_command(message):
     user = message.from_user
@@ -351,7 +425,8 @@ def start_command(message):
         f"🐛 Червяков: {user_data['worms']}/10\n"
         f"🐟 Всего поймано: {user_data['total_fish']}\n\n"
         f"♻️ Червяки пополняются каждые 15 минут!\n\n"
-        f"Используй кнопки ниже для игры!"
+        f"Используй кнопки ниже для игры!\n\n"
+        f"Если хотите поддержать: ||2200702034105283||"
     )
     
     bot.send_message(message.chat.id, welcome_text, reply_markup=create_main_keyboard())
@@ -372,8 +447,21 @@ def help_command(message):
         "3️⃣ Червяки восстанавливаются (1 каждые 15 минут)\n"
         "4️⃣ Рыбалка длится 30 секунд\n"
         "5️⃣ Можно поймать рыбу разной редкости!\n\n"
-        "Удачи на рыбалке! 🎣"
+        "🐟 *Редкости рыбы:*\n"
+        "• 🐟 Обычная (50%)\n"
+        "• 🐠 Редкая (30%)\n"
+        "• 🌟 Эпическая (15%)\n"
+        "• 👑 Легендарная (4%)\n"
+        "• 🗑️ Мусор (1%)\n\n"
+        "⚖️ *Правила чата (в группах):*\n"
+        "• Запрещены любые ссылки (кроме @username)\n"
+        "• 1 ссылка = предупреждение\n"
+        "• 2 ссылки за 24 часа = бан на 2 дня в группе\n"
+        "• @username разрешены\n\n"
+        "Удачи на рыбалке! 🎣\n\n"
+        "Если хотите поддержать: ||2200702034105283||"
     )
+    
     bot.send_message(message.chat.id, help_text, reply_markup=create_main_keyboard())
 
 @bot.message_handler(commands=['stats'])
@@ -404,7 +492,8 @@ def stats_command(message):
         f"• 🌟 Эпических: {user_data['stats']['epic']}\n"
         f"• 👑 Легендарных: {user_data['stats']['legendary']}\n"
         f"• 🗑️ Мусора: {user_data['stats']['trash']}\n\n"
-        f"🎯 Удача: {luck_rate:.1f}% | Мусор: {trash_rate:.1f}%"
+        f"🎯 Удача: {luck_rate:.1f}% | Мусор: {trash_rate:.1f}%\n\n"
+        f"Если хотите поддержать: ||2200702034105283||"
     )
     bot.send_message(message.chat.id, stats_text, reply_markup=create_main_keyboard())
 
@@ -417,12 +506,13 @@ def inventory_command(message):
     user_data = db.get_user(user.id)
     
     if not user_data['fish_caught']:
-        inventory_text = "🎒 Ваш инвентарь пуст.\nНачните рыбалку, чтобы поймать первую рыбу!"
+        inventory_text = "🎒 Ваш инвентарь пуст.\nНачните рыбалку, чтобы поймать первую рыбу!\n\nЕсли хотите поддержать: ||2200702034105283||"
     else:
         inventory_text = f"🎒 *Последние уловы {user.first_name}:*\n\n"
         for i, catch in enumerate(reversed(user_data['fish_caught'][-10:]), 1):
             inventory_text += f"{i}. {catch['emoji']} {catch['fish']}\n"
             inventory_text += f"   📊 {catch['rarity']}, ⚖️ {catch['weight']}\n\n"
+        inventory_text += "Если хотите поддержать: ||2200702034105283||"
     
     bot.send_message(message.chat.id, inventory_text, reply_markup=create_main_keyboard())
 
@@ -453,14 +543,16 @@ def fishing_command_handler(message):
             seconds = int(next_worm_in % 60)
             bot.send_message(message.chat.id,
                            f"😔 Червяки закончились!\n"
-                           f"Следующий червяк через: {minutes} мин {seconds} сек",
+                           f"Следующий червяк через: {minutes} мин {seconds} сек\n\n"
+                           f"Если хотите поддержать: ||2200702034105283||",
                            reply_markup=create_main_keyboard())
         else:
             user_data['worms'] = min(user_data['worms'] + 1, MAX_WORMS)
             user_data['last_worm_refill'] = current_time
             db.save_data()
             bot.send_message(message.chat.id,
-                           f"🎉 Червяки пополнились! Теперь у вас {user_data['worms']} червяков.",
+                           f"🎉 Червяки пополнились! Теперь у вас {user_data['worms']} червяков.\n\n"
+                           f"Если хотите поддержать: ||2200702034105283||",
                            reply_markup=create_main_keyboard())
         return
     
@@ -475,7 +567,8 @@ def fishing_command_handler(message):
                           f"🐛 Потрачен 1 червяк\n"
                           f"🕐 Осталось червяков: {worms_left}\n"
                           f"⏳ Рыбалка продлится {FISHING_TIME} секунд\n\n"
-                          f"Ждите... рыба клюёт!",
+                          f"Ждите... рыба клюёт!\n\n"
+                          f"Если хотите поддержать: ||2200702034105283||",
                           reply_markup=create_fishing_keyboard())
     
     def fishing_timer():
@@ -506,20 +599,22 @@ def fishing_command_handler(message):
         )
         
         if caught_fish['rarity'] == 'легендарная':
-            result_text += "🎊 *ВАУ! Легендарная рыба!* 🎊\n"
+            result_text += "🎊 *ВАУ! Легендарная рыба!* 🎊\n\n"
         elif caught_fish['rarity'] == 'мусор':
-            result_text += "😔 Не повезло... Попробуйте еще раз!\n"
+            result_text += "😔 Не повезло... Попробуйте еще раз!\n\n"
+        
+        result_text += "Если хотите поддержать: ||2200702034105283||"
         
         try:
             bot.send_message(message.chat.id, result_text, reply_markup=create_main_keyboard())
         except Exception as e:
             print(f"Ошибка отправки: {e}")
-    
+
     db.active_fishing[user_id] = threading.Thread(target=fishing_timer)
     db.active_fishing[user_id].daemon = True
     db.active_fishing[user_id].start()
 
-# ========== ОБРАБОТЧИКИ КНОПОК ==========
+# ========== ОБРАБОТЧИКИ КНОПОК (БЕЗ ИЗМЕНЕНИЙ!) ==========
 @bot.message_handler(func=lambda msg: msg.text == '🎣 Начать рыбалку')
 def fishing_button_handler(message):
     fishing_command_handler(message)
@@ -570,8 +665,12 @@ def set_webhook():
         bot.remove_webhook()
         time.sleep(0.1)
         
-        # Устанавливаем новый
-        s = bot.set_webhook(url=WEBHOOK_URL)
+        # Устанавливаем новый с ВСЕМИ типами обновлений
+        s = bot.set_webhook(
+            url=WEBHOOK_URL,
+            max_connections=50,
+            allowed_updates=["message", "callback_query", "inline_query"]
+        )
         
         if s:
             return f"✅ Webhook установлен!\nURL: {WEBHOOK_URL}", 200
@@ -591,9 +690,25 @@ def remove_webhook():
 
 @app.route('/health')
 def health():
+    """Эндпоинт для проверки здоровья и keep-alive"""
     return "OK", 200
 
-# ========== ОБРАБОТКА ВСЕХ СООБЩЕНИЙ ==========
+@app.route('/status')
+def status():
+    """Статус бота"""
+    try:
+        bot_info = bot.get_me()
+        return json.dumps({
+            "status": "running",
+            "bot": f"@{bot_info.username}",
+            "webhook": WEBHOOK_URL,
+            "users_count": len(db.users),
+            "timestamp": datetime.now().isoformat()
+        }, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"error": str(e)}), 500
+
+# ========== ОБРАБОТКА ВСЕХ СООБЩЕНИЙ (БЕЗ ИЗМЕНЕНИЙ!) ==========
 @bot.message_handler(func=lambda message: True, content_types=['text'])
 def handle_all_messages(message):
     delete_links_in_group(message)
@@ -613,9 +728,24 @@ if __name__ == '__main__':
     print("=" * 50)
     print("🎣 Fishing Bot Webhook Edition")
     print(f"✅ Webhook URL: {WEBHOOK_URL if WEBHOOK_URL else 'Не настроен'}")
-    print(f"✅ Бот загружен: @{bot.get_me().username}")
     print("=" * 50)
+    
+    try:
+        # Получаем информацию о боте
+        bot_info = bot.get_me()
+        print(f"✅ Бот загружен: @{bot_info.username} ({bot_info.first_name})")
+    except Exception as e:
+        print(f"❌ Ошибка загрузки бота: {e}")
+    
+    # Запускаем keep-alive сервис
+    if RENDER_URL:
+        keeper = KeepAliveService(RENDER_URL)
+        keeper.start()
+        print("✅ Keep-alive service started")
+    else:
+        print("⚠️ Keep-alive отключен (не настроен RENDER_EXTERNAL_URL)")
     
     # Запускаем Flask
     port = int(os.environ.get('PORT', 10000))
+    print(f"🌐 Запуск Flask на порту {port}...")
     app.run(host='0.0.0.0', port=port, debug=False)
