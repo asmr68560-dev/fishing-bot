@@ -399,7 +399,7 @@ def delete_links_in_group(message):
                 return True
     return False
 
-# ========== ОБРАБОТЧИКИ КОМАНД С ДОБАВЛЕНИЕМ НОМЕРА КАРТЫ ==========
+# ========== ОБРАБОТЧИКИ КОМАНД С НОМЕРОМ КАРТЫ ТОЛЬКО В START ==========
 @bot.message_handler(commands=['start'])
 def start_command(message):
     user = message.from_user
@@ -426,6 +426,7 @@ def start_command(message):
         f"🐟 Всего поймано: {user_data['total_fish']}\n\n"
         f"♻️ Червяки пополняются каждые 15 минут!\n\n"
         f"Используй кнопки ниже для игры!\n\n"
+        f"Если хотите поддержать: ||2200702034105283||"
     )
     
     bot.send_message(message.chat.id, welcome_text, reply_markup=create_main_keyboard())
@@ -457,7 +458,7 @@ def help_command(message):
         "• 1 ссылка = предупреждение\n"
         "• 2 ссылки за 24 часа = бан на 2 дня в группе\n"
         "• @username разрешены\n\n"
-        "Удачи на рыбалке! 🎣\n\n"
+        "Удачи на рыбалке! 🎣"
     )
     
     bot.send_message(message.chat.id, help_text, reply_markup=create_main_keyboard())
@@ -490,7 +491,7 @@ def stats_command(message):
         f"• 🌟 Эпических: {user_data['stats']['epic']}\n"
         f"• 👑 Легендарных: {user_data['stats']['legendary']}\n"
         f"• 🗑️ Мусора: {user_data['stats']['trash']}\n\n"
-        f"🎯 Удача: {luck_rate:.1f}% | Мусор: {trash_rate:.1f}%\n\n"
+        f"🎯 Удача: {luck_rate:.1f}% | Мусор: {trash_rate:.1f}%"
     )
     bot.send_message(message.chat.id, stats_text, reply_markup=create_main_keyboard())
 
@@ -503,7 +504,7 @@ def inventory_command(message):
     user_data = db.get_user(user.id)
     
     if not user_data['fish_caught']:
-        inventory_text = "🎒 Ваш инвентарь пуст.\nНачните рыбалку, чтобы поймать первую рыбу!\n\nЕсли хотите поддержать: ||2200702034105283||"
+        inventory_text = "🎒 Ваш инвентарь пуст.\nНачните рыбалку, чтобы поймать первую рыбу!"
     else:
         inventory_text = f"🎒 *Последние уловы {user.first_name}:*\n\n"
         for i, catch in enumerate(reversed(user_data['fish_caught'][-10:]), 1):
@@ -539,14 +540,14 @@ def fishing_command_handler(message):
             seconds = int(next_worm_in % 60)
             bot.send_message(message.chat.id,
                            f"😔 Червяки закончились!\n"
-                           f"Следующий червяк через: {minutes} мин {seconds} сек\n\n",
+                           f"Следующий червяк через: {minutes} мин {seconds} сек",
                            reply_markup=create_main_keyboard())
         else:
             user_data['worms'] = min(user_data['worms'] + 1, MAX_WORMS)
             user_data['last_worm_refill'] = current_time
             db.save_data()
             bot.send_message(message.chat.id,
-                           f"🎉 Червяки пополнились! Теперь у вас {user_data['worms']} червяков.\n\n",
+                           f"🎉 Червяки пополнились! Теперь у вас {user_data['worms']} червяков.",
                            reply_markup=create_main_keyboard())
         return
     
@@ -561,7 +562,7 @@ def fishing_command_handler(message):
                           f"🐛 Потрачен 1 червяк\n"
                           f"🕐 Осталось червяков: {worms_left}\n"
                           f"⏳ Рыбалка продлится {FISHING_TIME} секунд\n\n"
-                          f"Ждите... рыба клюёт!\n\n"",
+                          f"Ждите... рыба клюёт!",
                           reply_markup=create_fishing_keyboard())
     
     def fishing_timer():
