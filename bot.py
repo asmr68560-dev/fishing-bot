@@ -1798,7 +1798,7 @@ def donate_command(message):
         f"• Специальные удочки\n"
         f"• Игровую валюту\n"
         f"• Ускорение прогресса\n\n"
-        f"📞 *Для связи:* @monstrov\n"
+        f"📞 *Для связи:* @Ponchik_Pyps или @Belka759\n"
         f"💳 *Карта для перевода:* ||2200702034105283||\n\n"
         f"Выберите категорию:"
     )
@@ -1952,7 +1952,7 @@ def give_donate_command(message):
     parts = message.text.split()
     if len(parts) < 3:
         bot.send_message(message.chat.id, "❌ Формат: /выдатьдонат @username/id код_пакета")
-        bot.send_message(message.chat.id, "Пример: /выдатьдонат @monstrov 299RUBUNBR")
+        bot.send_message(message.chat.id, "Пример: /выдатьдонат @telegram 299RUBUNBR")
         return
     
     target = parts[1]
@@ -2047,7 +2047,7 @@ def ban_admin_command(message):
     parts = message.text.split()
     if len(parts) < 3:
         bot.send_message(message.chat.id, "❌ Формат: /бан @username/id дни причина")
-        bot.send_message(message.chat.id, "Пример: /бан @monstrov 7 неадекват")
+        bot.send_message(message.chat.id, "Пример: /бан @telegram 7 неадекват")
         return
     
     target = parts[1]
@@ -2154,7 +2154,7 @@ def mute_admin_command(message):
     parts = message.text.split()
     if len(parts) < 3:
         bot.send_message(message.chat.id, "❌ Формат: /мут @username/id минуты причина")
-        bot.send_message(message.chat.id, "Пример: /мут @monstrov 60 флуд")
+        bot.send_message(message.chat.id, "Пример: /мут @telegram 60 флуд")
         return
     
     target = parts[1]
@@ -3034,8 +3034,8 @@ def admin_ban_menu_handler(message):
                     "/бан @username дни причина - Забанить\n"
                     "/разбан @username - Разбанить\n\n"
                     "Пример:\n"
-                    "/бан @monstrov 7 неадекват\n"
-                    "/разбан @monstrov",
+                    "/бан @user 7 неадекват\n"
+                    "/разбан @user",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
 @bot.message_handler(func=lambda msg: msg.text == '🔇 Мут/Размут')
@@ -3050,8 +3050,8 @@ def admin_mute_menu_handler(message):
                     "/мут @username минуты причина - Замутить\n"
                     "/размут @username - Размутить\n\n"
                     "Пример:\n"
-                    "/мут @monstrov 60 флуд\n"
-                    "/размут @monstrov",
+                    "/мут @user 60 флуд\n"
+                    "/размут @user",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
 @bot.message_handler(func=lambda msg: msg.text == '⚠️ Предупреждение')
@@ -3065,7 +3065,7 @@ def admin_warn_menu_handler(message):
                     "📋 Команда:\n"
                     "/пред @username причина - Предупреждение\n\n"
                     "Пример:\n"
-                    "/пред @monstrov спам\n\n"
+                    "/пред @user спам\n\n"
                     "2 предупреждения = автоматический бан",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
@@ -3094,7 +3094,7 @@ def admin_donate_menu_handler(message):
                     "899RUBPRO - Профессиональный набор\n"
                     "1999RUBLEG - Легендарный набор\n\n"
                     "Пример:\n"
-                    "/выдатьдонат @monstrov 299RUBUNBR",
+                    "/выдатьдонат @user 299RUBUNBR",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
 @bot.message_handler(func=lambda msg: msg.text == '📜 Логи банов')
@@ -3124,8 +3124,8 @@ def admin_find_handler(message):
                     "📋 Команда:\n"
                     "/найти @username/id/имя\n\n"
                     "Пример:\n"
-                    "/найти @monstrov\n"
-                    "/найти 5330661807\n"
+                    "/найти @user\n"
+                    "/найти id\n"
                     "/найти Иван",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
@@ -3144,8 +3144,8 @@ def admin_give_handler(message):
                     "/выдать @user fish сумма название - Рыба\n"
                     "/выдать @user exp сумма - Опыт\n\n"
                     "Пример:\n"
-                    "/выдать @monstrov coins 1000\n"
-                    "/выдать @monstrov bait 10 🔴 Мотыль",
+                    "/выдать @user coins 1000\n"
+                    "/выдать @user bait 10 🔴 Мотыль",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
 @bot.message_handler(func=lambda msg: msg.text == '💰 Выдать монеты')
@@ -3159,7 +3159,7 @@ def admin_coins_handler(message):
                     "📋 Команда:\n"
                     "/выдать @user coins сумма\n\n"
                     "Пример:\n"
-                    "/выдать @monstrov coins 5000",
+                    "/выдать @user coins 5000",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
 @bot.message_handler(func=lambda msg: msg.text == '🌟 Выдать опыт')
@@ -3173,7 +3173,7 @@ def admin_exp_handler(message):
                     "📋 Команда:\n"
                     "/выдать @user exp сумма\n\n"
                     "Пример:\n"
-                    "/выдать @monstrov exp 1000",
+                    "/выдать @user exp 1000",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
 @bot.message_handler(func=lambda msg: msg.text == '📊 Статистика бота')
@@ -3195,8 +3195,8 @@ def admin_fullstats_handler(message):
                     "📋 Команда:\n"
                     "/статадмин @username/id\n\n"
                     "Пример:\n"
-                    "/статадмин @monstrov\n"
-                    "/статадмин 5330661807",
+                    "/статадмин @user\n"
+                    "/статадмин ID",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
 @bot.message_handler(func=lambda msg: msg.text == '🔄 Сброс игрока')
@@ -3214,7 +3214,7 @@ def admin_reset_handler(message):
                     "inventory - Инвентарь\n"
                     "all - Полный сброс\n\n"
                     "Пример:\n"
-                    "/сбросить @monstrov stats",
+                    "/сбросить @user stats",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
 @bot.message_handler(func=lambda msg: msg.text == '⚙️ Полное управление')
@@ -3875,8 +3875,8 @@ def callback_handler(call):
         donate_text += "📞 *Для получения:*\n"
         donate_text += "1. Переведите нужную сумму\n"
         donate_text += "2. Сделайте скриншот перевода\n"
-        donate_text += "3. Отправьте скриншот @monstrov\n"
-        donate_text += "4. Укажите ваш ID и код пакета\n\n"
+        donate_text += "3. Отправьте скриншот @Belka759 или @Ponchik_Pyps\n"
+        donate_text += "4. Укажите ваш ID * можно узнать в @userinfobot * и код пакета\n\n"
         donate_text += "✅ После проверки вам выдадут покупку!"
         
         markup = types.InlineKeyboardMarkup(row_width=2)
