@@ -341,25 +341,53 @@ ROD_UPGRADES = [
 # ========== ДОНАТ ПАКЕТЫ ==========
 DONATE_PACKAGES = [
     # Улучшения
-    {"name": "🛡️ Нерушимость удочки", "price_rub": 299, "emoji": "🛡️", "description": "Удочка никогда не ломается", "type": "upgrade", "effect": "unbreakable", "unique_code": "299RUBUNBR"},
-    {"name": "🔮 Удача +20%", "price_rub": 200, "emoji": "🔮", "description": "Постоянно +20% к удаче", "type": "upgrade", "effect": "luck_20", "unique_code": "200RUBLUCK"},
+    {"name": "🛡️ Нерушимость удочки", "price_rub": 299, "emoji": "🛡️", 
+     "description": "Удочка никогда не ломается", "type": "upgrade", 
+     "effect": "unbreakable", "unique_code": "299RUBUNBR"},
+    
+    {"name": "🔮 Удача +20%", "price_rub": 200, "emoji": "🔮", 
+     "description": "Постоянно +20% к удаче", "type": "upgrade", 
+     "effect": "luck_20", "unique_code": "200RUBLUCK"},
     
     # Удочки
-    {"name": "🎣 Спиннинг с удачей 30%", "price_rub": 499, "emoji": "🎣", "description": "Спиннинг с увеличенной удачей", "type": "rod", "effect": "special_spinning", "unique_code": "499RUBSPIN"},
-    {"name": "🏆 Легендарная удочка", "price_rub": 999, "emoji": "🏆", "description": "Лучшая удочка в игре", "type": "rod", "effect": "legendary_rod", "unique_code": "999RUBLEG"},
-    {"name": "🌊 Морской спиннинг PRO", "price_rub": 799, "emoji": "🌊", "description": "Для морской рыбалки", "type": "rod", "effect": "marine_pro", "unique_code": "799RUBMAR"},
+    {"name": "🎣 Спиннинг с удачей 30%", "price_rub": 499, "emoji": "🎣", 
+     "description": "Спиннинг с увеличенной удачей", "type": "rod", 
+     "effect": "special_spinning", "unique_code": "499RUBSPIN"},
+    
+    {"name": "🏆 Легендарная удочка", "price_rub": 999, "emoji": "🏆", 
+     "description": "Лучшая удочка в игре", "type": "rod", 
+     "effect": "legendary_rod", "unique_code": "999RUBLEG"},
+    
+    {"name": "🌊 Морской спиннинг PRO", "price_rub": 799, "emoji": "🌊", 
+     "description": "Для морской рыбалки", "type": "rod", 
+     "effect": "marine_pro", "unique_code": "799RUBMAR"},
     
     # Рыбоп
-    {"name": "💰 100 рыбоп", "price_rub": 50, "emoji": "💰", "description": "100 игровой валюты", "type": "coins", "amount": 100, "unique_code": "50RUB100"},
-    {"name": "💰 500 рыбоп", "price_rub": 200, "emoji": "💰", "description": "500 игровой валюты", "type": "coins", "amount": 500, "unique_code": "200RUB500"},
-    {"name": "💰 1000 рыбоп", "price_rub": 350, "emoji": "💰", "description": "1000 игровой валюты", "type": "coins", "amount": 1000, "unique_code": "350RUB1000"},
-    {"name": "💰 5000 рыбоп", "price_rub": 1500, "emoji": "💰", "description": "5000 игровой валюты", "type": "coins", "amount": 5000, "unique_code": "1500RUB5000"},
-    {"name": "💰 10000 рыбоп", "price_rub": 2800, "emoji": "💰", "description": "10000 игровой валюты", "type": "coins", "amount": 10000, "unique_code": "2800RUB10000"},
+    {"name": "💰 100 рыбоп", "price_rub": 50, "emoji": "💰", 
+     "description": "100 игровой валюты", "type": "coins", 
+     "effect": "coins_100", "amount": 100, "unique_code": "50RUB100"},
+    
+    {"name": "💰 500 рыбоп", "price_rub": 200, "emoji": "💰", 
+     "description": "500 игровой валюты", "type": "coins", 
+     "effect": "coins_500", "amount": 500, "unique_code": "200RUB500"},
+    
+    {"name": "💰 1000 рыбоп", "price_rub": 350, "emoji": "💰", 
+     "description": "1000 игровой валюты", "type": "coins", 
+     "effect": "coins_1000", "amount": 1000, "unique_code": "350RUB1000"},
+    
+    {"name": "💰 5000 рыбоп", "price_rub": 1500, "emoji": "💰", 
+     "description": "5000 игровой валюты", "type": "coins", 
+     "effect": "coins_5000", "amount": 5000, "unique_code": "1500RUB5000"},
+    
+    {"name": "💰 10000 рыбоп", "price_rub": 2800, "emoji": "💰", "description": "10000 игровой валюты", "type": "coins", "effect": "coins_10000", "amount": 10000, "unique_code": "2800RUB10000"},
     
     # Наборы
-    {"name": "🎁 Стартовый набор", "price_rub": 399, "emoji": "🎁", "description": "Удочка + 500 рыбоп + приманки", "type": "pack", "unique_code": "399RUBSTART"},
-    {"name": "🎁 Профессиональный набор", "price_rub": 899, "emoji": "🎁", "description": "Спиннинг + 2000 рыбоп + улучшение", "type": "pack", "unique_code": "899RUBPRO"},
-    {"name": "🎁 Легендарный набор", "price_rub": 1999, "emoji": "🎁", "description": "Легендарная удочка + 5000 рыбоп", "type": "pack", "unique_code": "1999RUBLEG"}
+    {"name": "🎁 Стартовый набор", "price_rub": 399, "emoji": "🎁", "description": "Удочка + 500 рыбоп + приманки", "type": "pack", "effect": "start", "unique_code": "399RUBSTART"},
+    {"name": "🎁 Профессиональный набор", "price_rub": 899, "emoji": "🎁", "description": "Спиннинг + 2000 рыбоп + улучшение", "type": "pack", "effect": "pro", "unique_code": "899RUBPRO"},
+    
+    {"name": "🎁 Легендарный набор", "price_rub": 1999, "emoji": "🎁", 
+     "description": "Легендарная удочка + 5000 рыбоп", "type": "pack", 
+     "effect": "leg", "unique_code": "1999RUBLEG"}
 ]
 
 # ========== ЕЖЕДНЕВНЫЕ ЗАДАНИЯ ==========
@@ -1070,15 +1098,22 @@ def get_user_from_input(input_str):
     """Получить user_id из входной строки (может быть ID или @username)"""
     # Если это числовой ID
     if input_str.isdigit():
-        return input_str
+        if input_str in db.users:
+            return input_str
+        else:
+            return input_str
     
-    # Если это @username, ищем в базе
-    if input_str.startswith('@'):
-        username = input_str[1:].lower()
-        for user_id, user_data in db.users.items():
-            if user_data.get('username', '').lower() == username:
-                return user_id
-    
+    username = input_str.lower().strip()
+    if username.startswith('@'):
+        username = username[1:]
+        
+    for user_id, user_data in db.users.items():
+        if user_data.get('username', '').lower() == username:
+            return user_id
+        
+        if user_data.get('first_name', '').lower() == username:
+            return user_id
+        
     return None
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
@@ -1950,48 +1985,48 @@ def give_donate_command(message):
     
     # Выдаем пакет
     if package['type'] == 'upgrade':
-        if package['effect'] == 'unbreakable':
+        if package['unique_code'] == '299RUBUNBR':
             # Делаем все удочки нерушимыми
             for rod in target_user['inventory']['rods']:
                 rod['unbreakable'] = True
             target_user['unbreakable_rods'] = True
             response = f"✅ Выдано улучшение 'Нерушимость' игроку {target_name}"
-        elif package['effect'] == 'luck_20':
+        elif package['unique_code'] == '200RUBLUCK':
             db.upgrade_rod(target_id, target_user['current_rod'], "luck_20")
             response = f"✅ Выдано улучшение 'Удача +20%' игроку {target_name}"
-    
+
     elif package['type'] == 'rod':
-        if package['effect'] == 'special_spinning':
+        if package['unique_code'] == '499RUBSPIN':
             db.add_rod(target_id, "🎣 Карбоновый спиннинг")
             db.set_current_rod(target_id, "🎣 Карбоновый спиннинг")
             response = f"✅ Выдана удочка 'Спиннинг с удачей 30%' игроку {target_name}"
-        elif package['effect'] == 'legendary_rod':
-            db.add_rod(target_id, "🏆 Легендарная карповая удочка")
-            db.set_current_rod(target_id, "🏆 Легендарная карповая удочка")
-            response = f"✅ Выдана 'Легендарная удочка' игроку {target_name}"
-        elif package['effect'] == 'marine_pro':
-            db.add_rod(target_id, "🎣 Морской спиннинг")
-            db.set_current_rod(target_id, "🎣 Морской спиннинг")
-            response = f"✅ Выдан 'Морской спиннинг PRO' игроку {target_name}"
-    
+    elif package['unique_code'] == '999RUBLEG':
+        db.add_rod(target_id, "🏆 Легендарная карповая удочка")
+        db.set_current_rod(target_id, "🏆 Легендарная карповая удочка")
+        response = f"✅ Выдана 'Легендарная удочка' игроку {target_name}"
+    elif package['unique_code'] == '799RUBMAR':
+        db.add_rod(target_id, "🎣 Морской спиннинг")
+        db.set_current_rod(target_id, "🎣 Морской спиннинг")
+        response = f"✅ Выдан 'Морской спиннинг PRO' игроку {target_name}"
+
     elif package['type'] == 'coins':
         amount = package['amount']
         db.add_coins(target_id, amount)
         response = f"✅ Выдано {amount} рыбоп игроку {target_name}"
-    
+
     elif package['type'] == 'pack':
-        if package['effect'] == 'start':
+        if package['unique_code'] == '399RUBSTART':
             db.add_coins(target_id, 500)
             db.add_rod(target_id, "🎣 Медиум спиннинг")
             db.add_bait(target_id, "🔴 Мотыль", 5)
             db.add_bait(target_id, "⚪ Белый опарыш", 5)
             response = f"✅ Выдан 'Стартовый набор' игроку {target_name}"
-        elif package['effect'] == 'pro':
+        elif package['unique_code'] == '899RUBPRO':
             db.add_coins(target_id, 2000)
             db.add_rod(target_id, "🎣 Хеви спиннинг")
             db.upgrade_rod(target_id, target_user['current_rod'], "luck_10")
             response = f"✅ Выдан 'Профессиональный набор' игроку {target_name}"
-        elif package['effect'] == 'leg':
+        elif package['unique_code'] == '1999RUBLEG':
             db.add_coins(target_id, 5000)
             db.add_rod(target_id, "🏆 Легендарная карповая удочка")
             response = f"✅ Выдан 'Легендарный набор' игроку {target_name}"
