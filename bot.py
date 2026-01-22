@@ -11,9 +11,6 @@ import threading
 import requests
 import math
 from datetime import datetime, timedelta
-from flask import Flask, request
-
-app = Flask(__name__)
 
 # ========== CONFIGURATION ==========
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8377535372:AAGLMfn_0P_tDvpJnfv_NmW4QclM2AIojEA')
