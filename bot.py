@@ -1201,17 +1201,18 @@ def create_main_keyboard(user_id=None):
     btn4 = types.KeyboardButton('🎒 Инвентарь')
     btn5 = types.KeyboardButton('🛒 Магазин')
     btn6 = types.KeyboardButton('💰 Продать рыбу')
-    btn7 = types.KeyboardButton('📜 Задания')
-    btn8 = types.KeyboardButton('🏆 Топ игроков')
-    btn9 = types.KeyboardButton('📰 Новости')
-    btn10 = types.KeyboardButton('💰 Донат')
-    btn11 = types.KeyboardButton('❓ Помощь')
+    btn7 = types.KeyboardButton('🎣 Выбрать приманку')  # ← НОВАЯ КНОПКА
+    btn8 = types.KeyboardButton('📜 Задания')           # ← эта была btn7
+    btn9 = types.KeyboardButton('🏆 Топ игроков')       # ← эта была btn8
+    btn10 = types.KeyboardButton('📰 Новости')          # ← эта была btn9
+    btn11 = types.KeyboardButton('💰 Донат')            # ← эта была btn10
+    btn12 = types.KeyboardButton('❓ Помощь')           # ← эта была btn11
     
     if user_id and is_admin(user_id):
-        btn12 = types.KeyboardButton('👑 Админ панель')
-        markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12)
+        btn13 = types.KeyboardButton('👑 Админ панель')  # ← эта была btn12
+        markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12, btn13)
     else:
-        markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11)
+        markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12)
     
     return markup
 
@@ -1785,18 +1786,33 @@ def fishing_command_handler(message):
         bot.send_message(message.chat.id, "Ошибка! Не удалось начать рыбалку.")
         return
     
-    # Выбираем приманку случайно из имеющихся
-    available_baits = []
+    # Используем выбранную или любую другую приманку
+    selected_bait = user_data.get('current_bait', '🌱 Обычный червь')
+    bait_used = False
+
+    # Проверяем есть ли выбранная приманка
+    has_bait = False
     for bait in user_data['inventory']['baits']:
-        if bait['count'] > 0:
-            available_baits.extend([bait['name']] * bait['count'])
-    
-    if available_baits:
-        selected_bait = random.choice(available_baits)
+        if bait['name'] == selected_bait and bait['count'] > 0:
+            has_bait = True
+            break
+
+    if has_bait:
+        # Используем выбранную приманку
         bait_used = db.use_bait(user.id, selected_bait)
     else:
-        selected_bait = "🌱 Обычный червь"
-        bait_used = False
+        # Ищем любую другую приманку
+        available_baits = []
+        for bait in user_data['inventory']['baits']:
+            if bait['count'] > 0:
+                available_baits.extend([bait['name']] * bait['count'])
+    
+        if available_baits:
+            selected_bait = random.choice(available_baits)
+            bait_used = db.use_bait(user.id, selected_bait)
+        else:
+            selected_bait = "🌱 Обычный червь"
+            bait_used = False
     
     # Сначала отправляем сообщение о начале рыбалки
     msg = bot.send_message(message.chat.id,
@@ -1872,6 +1888,34 @@ def fishing_command_handler(message):
     
     # Отправляем результат
     bot.send_message(message.chat.id, result_text, reply_markup=create_main_keyboard(user.id))
+
+# Примерно строка 1850
+@bot.message_handler(commands=['приманка', 'bait'])
+def select_bait_command(message):
+    user = message.from_user
+    user_data = db.get_user(user.id)
+    
+    if not user_data['inventory']['baits']:
+        bot.send_message(message.chat.id, "🎣 У вас нет приманок! Купите в магазине.", 
+                        reply_markup=create_main_keyboard(user.id))
+        return
+    
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    
+    # Показываем все приманки
+    for bait in user_data['inventory']['baits']:
+        if bait['count'] > 0:
+            btn = types.InlineKeyboardButton(
+                f"{bait['name']} ({bait['count']} шт)", 
+                callback_data=f'select_bait_{bait["name"]}'
+            )
+            markup.add(btn)
+    
+    btn_menu = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+    markup.add(btn_menu)
+    
+    text = f"🎣 *Выбор приманки*\n\nВыберите приманку для рыбалки:\n\nТекущая приманка: {user_data.get('current_bait', '🌱 Обычный червь')}"
+    bot.send_message(message.chat.id, text, reply_markup=markup)
 
 # ========== АДМИН КОМАНДЫ 1 УРОВЕНЬ (ДОНАТ) ==========
 @bot.message_handler(commands=['выдатьдонат', 'givedonate'])
@@ -2919,6 +2963,10 @@ def donate_button_handler(message):
 def help_button_handler(message):
     help_command(message)
 
+@bot.message_handler(func=lambda msg: msg.text == '🎣 Выбрать приманку')
+def select_bait_button(message):
+    select_bait_command(message)
+
 @bot.message_handler(func=lambda msg: msg.text == '👑 Админ панель')
 def admin_panel_handler(message):
     user = message.from_user
@@ -3842,6 +3890,23 @@ def callback_handler(call):
     elif call.data.startswith('admin_userinfo_'):
         user_id = call.data.split('_')[2]
         admin_stats_command(call)
+
+    # ВЫБОР ПРИМАНКИ - ДОБАВЬ ЭТО В САМОМ КОНЦЕ, ПЕРЕД КОНЦОМ ФУНКЦИИ
+    elif call.data.startswith('select_bait_'):
+        bait_name = call.data[12:]  # Убираем 'select_bait_'
+    
+        db.set_current_bait(user.id, bait_name)
+        bot.answer_callback_query(call.id, f"✅ Выбрана приманка: {bait_name}")
+    
+        # Возвращаем в меню
+        bot.send_message(call.message.chat.id, 
+                        f"✅ Теперь используется приманка: {bait_name}\n\n"
+                        f"Нажмите '🎣 Начать рыбалку' для рыбалки с этой приманкой.",
+                        reply_markup=create_main_keyboard(user.id))
+
+    # Если callback не обработан
+    else:
+        bot.answer_callback_query(call.id, "⚠️ Неизвестная команда")
 
 # ========== ОБРАБОТКА ВСЕХ СООБЩЕНИЙ ==========
 @bot.message_handler(func=lambda message: True, content_types=['text'])
