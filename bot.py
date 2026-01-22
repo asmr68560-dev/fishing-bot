@@ -15,79 +15,6 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-# ========== KEEP-ALIVE SYSTEM ==========
-class KeepAliveService:
-    """Сервис для поддержания бота в активном состоянии на Render"""
-    
-    def __init__(self, base_url):
-        self.base_url = base_url
-        self.running = False
-        self.thread = None
-        self.ping_interval = 480  # 8 минут (меньше 15 мин сна Render)
-        
-    def start(self):
-        """Запускаем keep-alive в фоновом режиме"""
-        if self.running:
-            return
-            
-        self.running = True
-        self.thread = threading.Thread(target=self._ping_loop, daemon=True)
-        self.thread.start()
-        print(f"✅ Keep-alive запущен. Ping каждые {self.ping_interval//60} минут")
-        
-    def stop(self):
-        """Останавливаем keep-alive"""
-        self.running = False
-        if self.thread:
-            self.thread.join(timeout=2)
-            
-    def _ping_loop(self):
-        """Основной цикл пингов"""
-        ping_count = 0
-        
-        # Первый пинг сразу при старте
-        self._send_ping()
-        ping_count += 1
-        
-        while self.running:
-            try:
-                # Ждем указанный интервал
-                time.sleep(self.ping_interval)
-                
-                if self.running:
-                    self._send_ping()
-                    ping_count += 1
-                    
-                    # Логируем каждые 10 пингов
-                    if ping_count % 10 == 0:
-                        print(f"📊 Keep-alive: отправлено {ping_count} пингов")
-                        
-            except Exception as e:
-                print(f"⚠️ Ошибка в keep-alive: {e}")
-                
-    def _send_ping(self):
-        """Отправляем ping запрос"""
-        try:
-            start_time = time.time()
-            response = requests.get(
-                f"{self.base_url}/health",
-                timeout=10,
-                headers={'User-Agent': 'KeepAlive/1.0'}
-            )
-            elapsed = time.time() - start_time
-            
-            if response.status_code == 200:
-                print(f"🔄 Ping успешен: {response.text.strip()} ({elapsed:.1f} сек)")
-            else:
-                print(f"⚠️ Ping ошибка: {response.status_code}")
-                
-        except requests.exceptions.Timeout:
-            print("⏰ Ping timeout (10 сек)")
-        except requests.exceptions.ConnectionError:
-            print("🔌 Ошибка соединения")
-        except Exception as e:
-            print(f"❌ Ошибка ping: {type(e).__name__}")
-
 # ========== CONFIGURATION ==========
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8377535372:AAGLMfn_0P_tDvpJnfv_NmW4QclM2AIojEA')
 bot = telebot.TeleBot(BOT_TOKEN)
@@ -3869,8 +3796,8 @@ def callback_handler(call):
         donate_text += "📞 *Для получения:*\n"
         donate_text += "1. Переведите нужную сумму\n"
         donate_text += "2. Сделайте скриншот перевода\n"
-        donate_text += "3. Отправьте скриншот @\n"
-        donate_text += "4. Укажите ваш ID и код пакета\n\n"
+        donate_text += "3. Отправьте скриншот @Belka759\n"
+        donate_text += "4. Укажите ваш ID *можо узнать в @userinfobot * и код пакета\n\n"
         donate_text += "✅ После проверки вам выдадут покупку!"
         
         markup = types.InlineKeyboardMarkup(row_width=2)
@@ -3909,7 +3836,6 @@ def handle_media_messages(message):
     delete_links_in_group(message)
 
 # ========== WEBHOOK РОУТЫ ==========
-@app.route(f'/{BOT_TOKEN}', methods=['POST'])
 def webhook():
     """Основной endpoint для получения обновлений от Telegram"""
     if request.headers.get('content-type') == 'application/json':
@@ -3919,11 +3845,9 @@ def webhook():
         return 'ok', 200
     return 'error', 403
 
-@app.route('/')
 def home():
     return "🎣 Fishing Bot is running! Use /set_webhook to configure", 200
 
-@app.route('/set_webhook', methods=['GET'])
 def set_webhook():
     """Установка webhook (вызовите этот URL один раз)"""
     if not WEBHOOK_URL:
@@ -3948,7 +3872,6 @@ def set_webhook():
     except Exception as e:
         return f"❌ Ошибка: {str(e)}", 500
 
-@app.route('/remove_webhook', methods=['GET'])
 def remove_webhook():
     """Удаление webhook (если нужно перейти на polling)"""
     try:
@@ -3957,12 +3880,10 @@ def remove_webhook():
     except Exception as e:
         return f"❌ Ошибка: {str(e)}", 500
 
-@app.route('/health')
 def health():
     """Эндпоинт для проверки здоровья и keep-alive"""
     return "OK", 200
 
-@app.route('/status')
 def status():
     """Статус бота"""
     try:
@@ -3984,8 +3905,7 @@ def status():
 # ========== ЗАПУСК ПРИЛОЖЕНИЯ ==========
 if __name__ == '__main__':
     print("=" * 50)
-    print("🎣 Fishing Bot Webhook Edition - РАСШИРЕННАЯ ВЕРСИЯ")
-    print(f"✅ Webhook URL: {WEBHOOK_URL if WEBHOOK_URL else 'Не настроен'}")
+    print("🎣 Fishing Bot Polling Edition - Instant Fishing")
     print("=" * 50)
     
     try:
@@ -4003,16 +3923,15 @@ if __name__ == '__main__':
     print(f"⚙️ Улучшений: {len(ROD_UPGRADES)}")
     print(f"💰 Донат-пакетов: {len(DONATE_PACKAGES)}")
     print(f"👥 Пользователей в базе: {len(db.users)}")
+
+    try:
+        bot.remove_webhook()
+        print("Webhook очищен")
+        time.sleep(0.1)
+    except:
+        pass
     
-    # Запускаем keep-alive сервис
-    if RENDER_URL:
-        keeper = KeepAliveService(RENDER_URL)
-        keeper.start()
-        print("✅ Keep-alive service started")
-    else:
-        print("⚠️ Keep-alive отключен (не настроен RENDER_EXTERNAL_URL)")
-    
-    # Запускаем Flask
-    port = int(os.environ.get('PORT', 10000))
-    print(f"🌐 Запуск Flask на порту {port}...")
-    app.run(host='0.0.0.0', port=port, debug=False)
+    print(" Запуск бота в режиме polling...")
+    print(" Бот запуще! Ожидайте сообщений...")
+
+    bot.polling(none_stop=True, interval=0 ,timeout=20)
