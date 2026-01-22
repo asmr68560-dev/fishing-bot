@@ -1098,22 +1098,23 @@ def get_user_from_input(input_str):
     """Получить user_id из входной строки (может быть ID или @username)"""
     # Если это числовой ID
     if input_str.isdigit():
-        if input_str in db.users:
-            return input_str
-        else:
-            return input_str
+        return input_str
     
-    username = input_str.lower().strip()
-    if username.startswith('@'):
-        username = username[1:]
-        
+    # Если это @username, ищем в базе
+    if input_str.startswith('@'):
+        username = input_str[1:].lower()
+        for user_id, user_data in db.users.items():
+            user_username = user_data.get('username')
+            if user_username and user_username.lower() == username:
+                return user_id
+    
+    # Если это просто текст (имя), ищем по имени
+    search_name = input_str.lower()
     for user_id, user_data in db.users.items():
-        if user_data.get('username', '').lower() == username:
+        user_name = user_data.get('first_name')
+        if user_name and user_name.lower() == search_name:
             return user_id
-        
-        if user_data.get('first_name', '').lower() == username:
-            return user_id
-        
+    
     return None
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
