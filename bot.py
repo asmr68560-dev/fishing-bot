@@ -598,7 +598,11 @@ class UserDatabase:
                 'donate_history': [],
                 'rod_upgrades': {},
                 'luck_bonus': 0.0,
-                'unbreakable_rods': False
+                'unbreakable_rods': False,
+                'top_nickname': None,           
+                'hide_from_top': False,        
+                'show_stats': True,            
+                'notifications': True         
             }
         
         user = self.users[user_id]
@@ -1033,8 +1037,19 @@ class UserDatabase:
     def get_top_players(self, category="coins", limit=10):
         """Получаем топ игроков по различным категориям"""
         users_list = []
-        
+    
         for user_id, user_data in self.users.items():
+            # 1. Пропускаем игроков, которые скрылись из топа
+            if user_data.get('hide_from_top', False):
+                continue  # ← этот игрок не будет в топе
+        
+            # 2. Определяем какое имя показывать в топе
+            # Сначала проверяем кастомный ник, если его нет - берем имя
+            display_name = user_data.get('top_nickname')
+            if not display_name:
+                display_name = user_data.get('first_name', 'Игрок')
+        
+            # 3. Считаем очки в зависимости от категории
             if category == "coins":
                 score = user_data.get('total_coins_earned', 0)
             elif category == "fish":
@@ -1047,17 +1062,21 @@ class UserDatabase:
                        user_data.get('stats', {}).get('rare', 0)
             else:
                 score = 0
-            
+        
+            # 4. Добавляем игрока в список
             users_list.append({
                 'user_id': user_id,
-                'username': user_data.get('username', 'Без имени'),
-                'first_name': user_data.get('first_name', 'Неизвестно'),
+                'username': user_data.get('username', ''),
+                'display_name': display_name,  # ← это имя покажем в топе
                 'score': score,
-                'level': user_data.get('fishing_level', 1)
+                'level': user_data.get('fishing_level', 1),
+                'hide_from_top': user_data.get('hide_from_top', False)  # ← сохраняем статус
             })
-        
-        # Сортируем по убыванию
+    
+        # 5. Сортируем по убыванию очков
         users_list.sort(key=lambda x: x['score'], reverse=True)
+    
+        # 6. Возвращаем только нужное количество игроков
         return users_list[:limit]
     
     def process_donate(self, transaction_id, verify=True):
@@ -1237,18 +1256,19 @@ def create_main_keyboard(user_id=None):
     btn4 = types.KeyboardButton('🎒 Инвентарь')
     btn5 = types.KeyboardButton('🛒 Магазин')
     btn6 = types.KeyboardButton('💰 Продать рыбу')
-    btn7 = types.KeyboardButton('🎣 Выбрать приманку')  # ← НОВАЯ КНОПКА
-    btn8 = types.KeyboardButton('📜 Задания')           # ← эта была btn7
-    btn9 = types.KeyboardButton('🏆 Топ игроков')       # ← эта была btn8
-    btn10 = types.KeyboardButton('📰 Новости')          # ← эта была btn9
-    btn11 = types.KeyboardButton('💰 Донат')            # ← эта была btn10
-    btn12 = types.KeyboardButton('❓ Помощь')           # ← эта была btn11
+    btn7 = types.KeyboardButton('🎣 Выбрать приманку')
+    btn8 = types.KeyboardButton('⚙️ Настройки')  # ← НОВАЯ КНОПКА
+    btn9 = types.KeyboardButton('📜 Задания')
+    btn10 = types.KeyboardButton('🏆 Топ игроков')
+    btn11 = types.KeyboardButton('📰 Новости')
+    btn12 = types.KeyboardButton('💰 Донат')
+    btn13 = types.KeyboardButton('❓ Помощь')
     
     if user_id and is_admin(user_id):
-        btn13 = types.KeyboardButton('👑 Админ панель')  # ← эта была btn12
-        markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12, btn13)
+        btn14 = types.KeyboardButton('👑 Админ панель')
+        markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12, btn13, btn14)
     else:
-        markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12)
+        markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10, btn11, btn12, btn13)
     
     return markup
 
@@ -1952,6 +1972,91 @@ def select_bait_command(message):
     
     text = f"🎣 *Выбор приманки*\n\nВыберите приманку для рыбалки:\n\nТекущая приманка: {user_data.get('current_bait', '🌱 Обычный червь')}"
     bot.send_message(message.chat.id, text, reply_markup=markup)
+
+# ========== НАСТРОЙКИ ==========
+@bot.message_handler(commands=['settings', 'настройки'])
+def settings_command(message):
+    user = message.from_user
+    user_data = db.get_user(user.id)
+    
+    # Получаем текущие настройки
+    nickname = user_data.get('top_nickname', user.first_name)
+    hide_from_top = user_data.get('hide_from_top', False)
+    
+    # Создаем клавиатуру настроек
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    
+    # Кнопка изменения ника
+    btn_nickname = types.InlineKeyboardButton(
+        f'📝 Ник в топе: {nickname}', 
+        callback_data='settings_change_nickname'
+    )
+    
+    # Кнопка скрытия из топа
+    hide_text = "✅ Скрыт из топа" if hide_from_top else "❌ Виден в топе"
+    btn_hide = types.InlineKeyboardButton(
+        f'👁️ {hide_text}', 
+        callback_data='settings_toggle_hide'
+    )
+    
+    # Кнопка сброса ника
+    btn_reset = types.InlineKeyboardButton(
+        '🔄 Сбросить ник', 
+        callback_data='settings_reset_nickname'
+    )
+    
+    btn_back = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+    
+    markup.add(btn_nickname, btn_hide, btn_reset, btn_back)
+    
+    settings_text = (
+        f"⚙️ *Настройки профиля*\n\n"
+        f"👤 Ваш ник в топе: *{nickname}*\n"
+        f"👁️ Статус в топе: {'*Скрыт* 👻' if hide_from_top else '*Виден* 👁️'}\n\n"
+        f"*Доступные действия:*\n"
+        f"• Изменить ник для топа\n"
+        f"• Скрыться из общего топа\n"
+        f"• Сбросить ник к имени\n"
+    )
+    
+    bot.send_message(message.chat.id, settings_text, reply_markup=markup)
+
+    def process_nickname_input(message, user_id):
+        """Обработка ввода нового ника для топа"""
+        try:
+            new_nickname = message.text.strip()
+        
+            # Простые проверки
+            if len(new_nickname) > 20:
+                bot.send_message(message.chat.id, 
+                               "❌ Слишком длинный ник! Максимум 20 символов.",
+                               reply_markup=create_main_keyboard(user_id))
+                return
+        
+            if len(new_nickname) < 2:
+                bot.send_message(message.chat.id, 
+                               "❌ Слишком короткий ник! Минимум 2 символа.",
+                               reply_markup=create_main_keyboard(user_id))
+                return
+        
+            # Сохраняем
+            user_data = db.get_user(user_id)
+            old_nickname = user_data.get('top_nickname', user_data.get('first_name', 'Игрок'))
+            user_data['top_nickname'] = new_nickname
+            db.save_data()
+        
+            # Отправляем подтверждение
+            bot.send_message(message.chat.id,
+                            f"✅ *Ник изменен!*\n\n"
+                            f"Старый: {old_nickname}\n"
+                            f"Новый: *{new_nickname}*\n\n"
+                            f"Теперь в топе будете отображаться под этим ником!",
+                            reply_markup=create_main_keyboard(user_id))
+        
+        except Exception as e:
+            bot.send_message(message.chat.id,
+                            f"❌ Ошибка: {str(e)}\nПопробуйте снова: /настройки",
+                            reply_markup=create_main_keyboard(user_id))
 
 # ========== АДМИН КОМАНДЫ 1 УРОВЕНЬ (ДОНАТ) ==========
 @bot.message_handler(commands=['выдатьдонат', 'givedonate'])
@@ -3003,6 +3108,11 @@ def help_button_handler(message):
 def select_bait_button(message):
     select_bait_command(message)
 
+@bot.message_handler(func=lambda msg: msg.text == '⚙️ Настройки')
+def settings_button_handler(message):
+    """Обработка кнопки настроек"""
+    settings_command(message)
+
 @bot.message_handler(func=lambda msg: msg.text == '👑 Админ панель')
 def admin_panel_handler(message):
     user = message.from_user
@@ -3861,8 +3971,8 @@ def callback_handler(call):
             medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
             score_format = f"{player['score']:,}".replace(",", " ") if category == 'coins' else str(player['score'])
             
-            top_text += f"{medal} *{player['first_name']}*\n"
-            if player['username']:
+            top_text += f"{medal} *{player['display_name']}*\n"
+            if player['username'] and not player.get('hide_from_top', False):
                 top_text += f"   👤 @{player['username']}\n"
             top_text += f"   🎣 Уровень: {player['level']}\n"
             top_text += f"   📊 Очки: {score_format}\n\n"
