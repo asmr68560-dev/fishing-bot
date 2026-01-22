@@ -9,6 +9,7 @@ import random
 import re
 import threading
 import requests
+import math
 from datetime import datetime, timedelta
 from flask import Flask, request
 
@@ -111,8 +112,8 @@ WORM_PRICE = 10
 # Админ система
 ADMINS = {
     "5330661807": 5,  # 5 уровень - полный доступ
-    "8351629145": 1,  # Изменено с 5 на 1 уровень
-    "7093049365": 1   # Изменено с 5 на 1 уровень
+    "8351629145": 1,  # Новые админы для доната
+    "7093049365": 5
 }
 ADMIN_LOG_FILE = 'admin_logs.json'
 ACTION_LOG_FILE = 'action_logs.json'
@@ -221,14 +222,14 @@ FISHES = [
     {"name": "Линь", "rarity": "редкая", "weight_range": (1, 7), "emoji": "🐟", "price": 130, "baits": ["червь", "мотыль", "опарыш"], "locations": ["Волга", "Дон"]},
     {"name": "Налим", "rarity": "редкая", "weight_range": (1, 12), "emoji": "🐟", "price": 140, "baits": ["червь", "мелкая рыба", "куски рыбы"], "locations": ["Байкал", "Волга", "Ладожское озеро", "Обь", "Енисей"]},
     {"name": "Осётр", "rarity": "легендарная", "weight_range": (10, 80), "emoji": "🐠", "price": 1000, "baits": ["червь", "мелкая рыба", "рак"], "locations": ["Каспийское море", "Амур", "Байкал"]},
-    {"name": "Белуга", "rarity": "легендарная", "weight_range": (50, 1500), "emoji": "🐳", "price": 5000, "baits": ["мелкая рыба", "червь", "рак"], "locations": ["Каспийское море"]},
+    {"name": "Белуга", "rarity": "легендарная", "weight_range": (50, 1500), "emoji": "🐳", "price": 2500, "baits": ["мелкая рыба", "червь", "рак"], "locations": ["Каспийское море"]},
     {"name": "Стерлядь", "rarity": "эпическая", "weight_range": (2, 16), "emoji": "🐟", "price": 800, "baits": ["червь", "мотыль", "опарыш"], "locations": ["Волга", "Обь"]},
     {"name": "Рак", "rarity": "обычная", "weight_range": (0.05, 0.3), "emoji": "🦞", "price": 40, "baits": ["червь", "рыба", "мясо"], "locations": ["Волга", "Дон", "Байкал"]},
     {"name": "Креветка", "rarity": "обычная", "weight_range": (0.02, 0.1), "emoji": "🦐", "price": 10, "baits": ["хлеб", "червь", "мотыль"], "locations": ["Каспийское море"]},
     {"name": "Краб", "rarity": "редкая", "weight_range": (0.3, 2), "emoji": "🦀", "price": 150, "baits": ["рыба", "мясо", "червь"], "locations": ["Каспийское море"]},
     {"name": "Кальмар", "rarity": "редкая", "weight_range": (1, 8), "emoji": "🐙", "price": 200, "baits": ["мелкая рыба", "червь", "креветка"], "locations": ["Каспийское море"]},
     {"name": "Фугу", "rarity": "эпическая", "weight_range": (1, 4), "emoji": "🐡", "price": 600, "baits": ["червь", "креветка", "мелкая рыба"], "locations": ["Каспийское море"]},
-    {"name": "Золотая рыбка", "rarity": "легендарная", "weight_range": (0.1, 0.3), "emoji": "👑", "price": 10000, "baits": ["червь", "мотыль", "хлеб"], "locations": ["Байкал", "Телецкое озеро"]},
+    {"name": "Золотая рыбка", "rarity": "легендарная", "weight_range": (0.1, 0.3), "emoji": "👑", "price": 700, "baits": ["червь", "мотыль", "хлеб"], "locations": ["Байкал", "Телецкое озеро"]},
     {"name": "Водоросли", "rarity": "мусор", "weight_range": (0.1, 0.5), "emoji": "🌿", "price": 1, "baits": [], "locations": ["Все водоемы"]},
     {"name": "Ботинок", "rarity": "мусор", "weight_range": (1, 2.5), "emoji": "🎣", "price": 1, "baits": [], "locations": ["Все водоемы"]},
     {"name": "Пакет", "rarity": "мусор", "weight_range": (0.2, 0.5), "emoji": "🗑️", "price": 1, "baits": [], "locations": ["Все водоемы"]},
@@ -298,14 +299,14 @@ FISHES = [
     {"name": "Ставрида", "rarity": "обычная", "weight_range": (0.1, 0.4), "emoji": "🐟", "price": 45, "baits": ["червь"], "locations": ["Каспийское море"]},
     {"name": "Скат", "rarity": "эпическая", "weight_range": (5, 20), "emoji": "🐠", "price": 1250, "baits": ["червь", "мелкая рыба"], "locations": ["Каспийское море"]},
     {"name": "Катран", "rarity": "эпическая", "weight_range": (8, 15), "emoji": "🦈", "price": 1400, "baits": ["мелкая рыба"], "locations": ["Каспийское море"]},
-    {"name": "Дельфин", "rarity": "легендарная", "weight_range": (50, 200), "emoji": "🐬", "price": 8000, "baits": ["рыба"], "locations": ["Каспийское море"]},
-    {"name": "Тюлень", "rarity": "легендарная", "weight_range": (70, 150), "emoji": "🦭", "price": 7000, "baits": ["рыба"], "locations": ["Байкал", "Каспийское море"]},
-    {"name": "Нерпа", "rarity": "легендарная", "weight_range": (50, 120), "emoji": "🦭", "price": 6000, "baits": ["рыба"], "locations": ["Байкал"]},
+    {"name": "Дельфин", "rarity": "легендарная", "weight_range": (50, 200), "emoji": "🐬", "price": 1500, "baits": ["рыба"], "locations": ["Каспийское море"]},
+    {"name": "Тюлень", "rarity": "легендарная", "weight_range": (70, 150), "emoji": "🦭", "price": 2500, "baits": ["рыба"], "locations": ["Байкал", "Каспийское море"]},
+    {"name": "Нерпа", "rarity": "легендарная", "weight_range": (50, 120), "emoji": "🦭", "price": 5800, "baits": ["рыба"], "locations": ["Байкал"]},
     {"name": "Белокровная щука", "rarity": "легендарная", "weight_range": (1, 5), "emoji": "❄️", "price": 4000, "baits": ["червь", "рыба"], "locations": ["Арктические воды"]},
     {"name": "Ледяная рыба", "rarity": "эпическая", "weight_range": (0.5, 2), "emoji": "❄️", "price": 1150, "baits": ["червь"], "locations": ["Арктические воды"]},
-    {"name": "Полярная акула", "rarity": "легендарная", "weight_range": (100, 400), "emoji": "🦈", "price": 10000, "baits": ["рыба"], "locations": ["Арктические воды"]},
-    {"name": "Гренландский кит", "rarity": "легендарная", "weight_range": (5000, 100000), "emoji": "🐋", "price": 50000, "baits": ["планктон"], "locations": ["Арктические воды"]},
-    {"name": "Морж", "rarity": "легендарная", "weight_range": (800, 2000), "emoji": "🦭", "price": 15000, "baits": ["моллюски"], "locations": ["Арктические воды"]},
+    {"name": "Полярная акула", "rarity": "легендарная", "weight_range": (100, 400), "emoji": "🦈", "price": 1000, "baits": ["рыба"], "locations": ["Арктические воды"]},
+    {"name": "Гренландский кит", "rarity": "легендарная", "weight_range": (5000, 100000), "emoji": "🐋", "price": 5000, "baits": ["планктон"], "locations": ["Арктические воды"]},
+    {"name": "Морж", "rarity": "легендарная", "weight_range": (800, 2000), "emoji": "🦭", "price": 4100, "baits": ["моллюски"], "locations": ["Арктические воды"]},
     {"name": "Морской чёрт", "rarity": "эпическая", "weight_range": (5, 25), "emoji": "👹", "price": 1350, "baits": ["червь", "рыба"], "locations": ["Дальневосточные моря"]},
     {"name": "Камбала", "rarity": "редкая", "weight_range": (1, 7), "emoji": "🐟", "price": 370, "baits": ["червь"], "locations": ["Дальневосточные моря"]},
     {"name": "Треска", "rarity": "обычная", "weight_range": (2, 15), "emoji": "🐟", "price": 140, "baits": ["червь", "рыба"], "locations": ["Дальневосточные моря"]},
@@ -318,9 +319,9 @@ FISHES = [
     {"name": "Морской ёж", "rarity": "редкая", "weight_range": (0.3, 1), "emoji": "🦔", "price": 190, "baits": ["водоросли"], "locations": ["Дальневосточные моря"]},
     {"name": "Морская звезда", "rarity": "мусор", "weight_range": (0.1, 0.5), "emoji": "⭐", "price": 2, "baits": [], "locations": ["Все моря"]},
     {"name": "Коралл", "rarity": "мусор", "weight_range": (0.5, 3), "emoji": "🪸", "price": 3, "baits": [], "locations": ["Тропические моря"]},
-    {"name": "Жемчуг", "rarity": "легендарная", "weight_range": (0.01, 0.05), "emoji": "💎", "price": 20000, "baits": [], "locations": ["Дальневосточные моря"]},
-    {"name": "Золотой самородок", "rarity": "легендарная", "weight_range": (0.1, 5), "emoji": "🥇", "price": 50000, "baits": [], "locations": ["Все водоемы"]},
-    {"name": "Сундук с сокровищами", "rarity": "легендарная", "weight_range": (10, 50), "emoji": "🧰", "price": 30000, "baits": [], "locations": ["Все моря"]}
+    {"name": "Жемчуг", "rarity": "легендарная", "weight_range": (0.01, 0.05), "emoji": "💎", "price": 2000, "baits": [], "locations": ["Дальневосточные моря"]},
+    {"name": "Золотой самородок", "rarity": "легендарная", "weight_range": (0.1, 5), "emoji": "🥇", "price": 4800, "baits": [], "locations": ["Все водоемы"]},
+    {"name": "Сундук с сокровищами", "rarity": "легендарная", "weight_range": (10, 50), "emoji": "🧰", "price": 1000, "baits": [], "locations": ["Все моря"]}
 ]
 
 # ========== ВИДЫ ЧЕРВЕЙ И НАЖИВОК ==========
@@ -695,14 +696,19 @@ class UserDatabase:
         return False
     
     def get_random_weight(self, weight_range):
-        """Генерация случайного веса в граммах"""
         min_weight, max_weight = weight_range
-        # Генерируем вес с шагом примерно 1-10 грамм
-        weight = random.randint(int(min_weight * 1000), int(max_weight * 1000))
-        # Добавляем случайность для реалистичности (например, 157, 234 грамма)
-        weight = weight + random.randint(-50, 50)
-        weight = max(10, weight)  # Минимум 10 грамм
-        return weight / 1000.0  # Возвращаем в кг
+
+        min_kg = int(min_weight)
+        max_kg = int(max_weight)
+        
+        if min_kg < 1:
+            min_kg = 1
+
+        weight = random.randint(min_kg, max_kg)
+
+        weight = max(1, weight)
+
+        return float(weight)
     
     def add_fish(self, user_id, fish, weight=None):
         user = self.get_user(user_id)
@@ -713,9 +719,9 @@ class UserDatabase:
         
         # Форматируем вес для отображения
         if weight < 1:
-            weight_display = f"{weight*1000:.0f}г"
+            weight_display = f"{int(weight*1000)}г"
         else:
-            weight_display = f"{weight:.2f}кг"
+            weight_display = f"{int(weight)}кг"
         
         catch = {
             'fish': fish['name'],
@@ -1135,11 +1141,6 @@ def get_user_from_input(input_str):
             if user_data.get('username', '').lower() == username:
                 return user_id
     
-    # Ищем по точному совпадению username без @
-    for user_id, user_data in db.users.items():
-        if user_data.get('username', '').lower() == input_str.lower():
-            return user_id
-    
     return None
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
@@ -1294,28 +1295,34 @@ def create_admin_keyboard(admin_level):
         btn4 = types.KeyboardButton('💰 Выдать донат')
         markup.add(btn1, btn2, btn3, btn4)
     
-    # Уровень 3 - Выдача предметов (было 2)
+    # Уровень 2 - Логи и админы
+    if admin_level >= 2:
+        btn5 = types.KeyboardButton('📜 Логи банов')
+        btn6 = types.KeyboardButton('📋 Список админов')
+        btn7 = types.KeyboardButton('👤 Поиск игрока')
+        markup.add(btn5, btn6, btn7)
+    
+    # Уровень 3 - Выдача предметов
     if admin_level >= 3:
         btn8 = types.KeyboardButton('🎣 Выдать предметы')
         btn9 = types.KeyboardButton('💰 Выдать монеты')
         btn10 = types.KeyboardButton('🌟 Выдать опыт')
         markup.add(btn8, btn9, btn10)
     
-    # Уровень 4 - Статистика и управление (было 3)
+    # Уровень 4 - Статистика и управление
     if admin_level >= 4:
-        btn12 = types.KeyboardButton('👤 Полная стата')
-        markup.add(btn12)
-    
-    # Уровень 5 - Полное управление (было 4-5)
-    if admin_level >= 5:
         btn11 = types.KeyboardButton('📊 Статистика бота')
+        btn12 = types.KeyboardButton('👤 Полная стата')
         btn13 = types.KeyboardButton('🔄 Сброс игрока')
+        markup.add(btn11, btn12, btn13)
+    
+    # Уровень 5 - Полное управление
+    if admin_level >= 5:
         btn14 = types.KeyboardButton('⚙️ Полное управление')
         btn15 = types.KeyboardButton('🗑️ Очистить логи')
         btn16 = types.KeyboardButton('📢 Отправить новость')
         btn17 = types.KeyboardButton('📜 Все логи')
-        btn18 = types.KeyboardButton('📋 Список админов')
-        markup.add(btn11, btn13, btn14, btn15, btn16, btn17, btn18)
+        markup.add(btn14, btn15, btn16, btn17)
     
     btn_back = types.KeyboardButton('📋 Меню')
     markup.add(btn_back)
@@ -1361,7 +1368,56 @@ def mute_user_in_group(chat_id, user_id, user_name, minutes=60, reason="Нару
         return False
 
 def delete_links_in_group(message):
-    # Отключено по просьбе Belka759
+    if message.chat.type in ['group', 'supergroup']:
+        text = message.text or message.caption or ""
+        
+        if URL_PATTERN.search(text):
+            all_matches = URL_PATTERN.findall(text)
+            has_other_links = False
+            
+            for match_group in all_matches:
+                for match in match_group:
+                    if match and not USERNAME_PATTERN.fullmatch(match):
+                        has_other_links = True
+                        break
+                if has_other_links:
+                    break
+            
+            if has_other_links:
+                try:
+                    user = message.from_user
+                    user_id = str(user.id)
+                    chat_id = message.chat.id
+                    
+                    if db.is_banned(user_id):
+                        ban_time_left = db.get_ban_time_left(user_id)
+                        days_left = int(ban_time_left // 86400)
+                        hours_left = int((ban_time_left % 86400) // 3600)
+                        minutes_left = int((ban_time_left % 3600) // 60)
+                        
+                        ban_message = (
+                            f"🚫 {user.first_name}, ты уже забанен!\n"
+                            f"⏳ Бан истечет через: {days_left}д {hours_left}ч {minutes_left}мин"
+                        )
+                        bot.send_message(chat_id, ban_message)
+                        return True
+                    
+                    bot.delete_message(chat_id, message.message_id)
+                    banned, warning_count, is_ban = db.add_warning(user_id, chat_id)
+                    
+                    if is_ban:
+                        ban_user_in_group(chat_id, user.id, user.first_name, "2 ссылки за 24 часа")
+                    else:
+                        warning_message = (
+                            f"⚠️ {user.first_name}, даю предупреждение!\n"
+                            f"На 2 раз даю бан, не кидай ссылки\n"
+                            f"📊 Предупреждений: {warning_count}/2"
+                        )
+                        bot.send_message(chat_id, warning_message)
+                    
+                except Exception as e:
+                    print(f"Ошибка удаления ссылки: {e}")
+                return True
     return False
 
 # ========== ОСНОВНЫЕ КОМАНДЫ ==========
@@ -1449,6 +1505,11 @@ def help_command(message):
         "• Продавайте рыбу NPC-торговцам\n"
         "• Разные NPC предпочитают разную рыбу\n"
         "• Предпочитаемая рыба дороже на 50%\n\n"
+        "⚖️ *Правила чата (в группах):*\n"
+        "• Запрещены любые ссылки (кроме @username)\n"
+        "• 1 ссылка = предупреждение\n"
+        "• 2 ссылки за 24 часа = бан на 2 дня в группе\n"
+        "• @username разрешены\n\n"
         "💰 *Донат:*\n"
         "• Поддержите развитие проекта\n"
         "• Получите уникальные улучшения\n"
@@ -1756,6 +1817,9 @@ def fishing_command_handler(message):
     if db.is_banned(str(user.id)):
         return
     
+    if delete_links_in_group(message):
+        return
+    
     user_id = str(user.id)
     
     if user_id in db.active_fishing:
@@ -1893,7 +1957,7 @@ def give_donate_command(message):
     
     parts = message.text.split()
     if len(parts) < 3:
-        bot.send_message(message.chat.id, "❌ Формат: /выдатьдонат @user/id код_пакета")
+        bot.send_message(message.chat.id, "❌ Формат: /выдатьдонат @username/id код_пакета")
         bot.send_message(message.chat.id, "Пример: /выдатьдонат @user 299RUBUNBR")
         return
     
@@ -1946,25 +2010,21 @@ def give_donate_command(message):
         response = f"✅ Выдано {amount} рыбоп игроку {target_name}"
     
     elif package['type'] == 'pack':
-        if package['unique_code'] == '399RUBSTART':
+        if package['effect'] == 'start':
             db.add_coins(target_id, 500)
             db.add_rod(target_id, "🎣 Медиум спиннинг")
             db.add_bait(target_id, "🔴 Мотыль", 5)
             db.add_bait(target_id, "⚪ Белый опарыш", 5)
             response = f"✅ Выдан 'Стартовый набор' игроку {target_name}"
-        elif package['unique_code'] == '899RUBPRO':
+        elif package['effect'] == 'pro':
             db.add_coins(target_id, 2000)
             db.add_rod(target_id, "🎣 Хеви спиннинг")
             db.upgrade_rod(target_id, target_user['current_rod'], "luck_10")
             response = f"✅ Выдан 'Профессиональный набор' игроку {target_name}"
-        elif package['unique_code'] == '1999RUBLEG':
+        elif package['effect'] == 'leg':
             db.add_coins(target_id, 5000)
             db.add_rod(target_id, "🏆 Легендарная карповая удочка")
             response = f"✅ Выдан 'Легендарный набор' игроку {target_name}"
-        else:
-            response = "❌ Неизвестный набор"
-            bot.send_message(message.chat.id, response)
-            return
     
     # Логируем действие
     db.log_admin_action(user.id, "give_donate", target_id, package['name'])
@@ -1992,7 +2052,7 @@ def ban_admin_command(message):
     
     parts = message.text.split()
     if len(parts) < 3:
-        bot.send_message(message.chat.id, "❌ Формат: /бан @user/id дни причина")
+        bot.send_message(message.chat.id, "❌ Формат: /бан @username/id дни причина")
         bot.send_message(message.chat.id, "Пример: /бан @user 7 неадекват")
         return
     
@@ -2056,7 +2116,7 @@ def unban_admin_command(message):
     
     parts = message.text.split()
     if len(parts) < 2:
-        bot.send_message(message.chat.id, "❌ Формат: /разбан @user/id")
+        bot.send_message(message.chat.id, "❌ Формат: /разбан @username/id")
         return
     
     target = parts[1]
@@ -2099,7 +2159,7 @@ def mute_admin_command(message):
     
     parts = message.text.split()
     if len(parts) < 3:
-        bot.send_message(message.chat.id, "❌ Формат: /мут @user/id минуты причина")
+        bot.send_message(message.chat.id, "❌ Формат: /мут @username/id минуты причина")
         bot.send_message(message.chat.id, "Пример: /мут @user 60 флуд")
         return
     
@@ -2153,7 +2213,7 @@ def unmute_admin_command(message):
     
     parts = message.text.split()
     if len(parts) < 2:
-        bot.send_message(message.chat.id, "❌ Формат: /размут @user/id")
+        bot.send_message(message.chat.id, "❌ Формат: /размут @username/id")
         return
     
     target = parts[1]
@@ -2196,7 +2256,7 @@ def warn_admin_command(message):
     
     parts = message.text.split()
     if len(parts) < 2:
-        bot.send_message(message.chat.id, "❌ Формат: /пред @user/id причина")
+        bot.send_message(message.chat.id, "❌ Формат: /пред @username/id причина")
         return
     
     target = parts[1]
@@ -2230,6 +2290,180 @@ def warn_admin_command(message):
     
     bot.send_message(message.chat.id, response)
 
+# ========== АДМИН КОМАНДЫ 2 УРОВЕНЬ ==========
+@bot.message_handler(commands=['логи', 'logs'])
+def logs_admin_command(message):
+    user = message.from_user
+    admin_level = get_admin_level(user.id)
+    
+    if admin_level < 2:
+        bot.send_message(message.chat.id, "❌ Недостаточно прав!")
+        return
+    
+    parts = message.text.split()
+    log_type = parts[1].lower() if len(parts) > 1 else "bans"
+    
+    if log_type == "bans" and admin_level >= 2:
+        # Логи банов
+        ban_logs = [log for log in db.admin_logs if log['action'] in ['ban', 'unban']]
+        
+        if not ban_logs:
+            bot.send_message(message.chat.id, "📜 Логов банов нет")
+            return
+        
+        # Создаем инлайн клавиатуру для пагинации
+        markup = types.InlineKeyboardMarkup()
+        
+        logs_text = "📜 *Логи банов/разбанов*\n\n"
+        for i, log in enumerate(ban_logs[-10:]):  # Последние 10 записей
+            action_ru = "Бан" if log['action'] == 'ban' else "Разбан"
+            timestamp = datetime.fromisoformat(log['timestamp']).strftime("%d.%m %H:%M")
+            
+            # Получаем имя админа
+            admin_user = db.get_user(log['admin_id'])
+            admin_name = admin_user.get('first_name', log['admin_id'])
+            
+            logs_text += f"⏰ *{timestamp}* | {action_ru}\n"
+            logs_text += f"👤 Игрок: {log['target_id']}\n"
+            logs_text += f"👮 Админ: {admin_name}\n"
+            if 'details' in log:
+                logs_text += f"📝 {log['details']}\n"
+            logs_text += "\n"
+        
+        # Кнопки для пагинации
+        btn_prev = types.InlineKeyboardButton('⬅️ Назад', callback_data='logs_bans_prev_0')
+        btn_next = types.InlineKeyboardButton('Вперед ➡️', callback_data='logs_bans_next_1')
+        markup.add(btn_prev, btn_next)
+        
+        bot.send_message(message.chat.id, logs_text, reply_markup=markup)
+    
+    elif log_type == "actions" and admin_level >= 5:
+        # Логи действий (только для 5 уровня)
+        if not db.action_logs:
+            bot.send_message(message.chat.id, "📜 Логов действий нет")
+            return
+        
+        logs_text = "📜 *Логи действий пользователей*\n\n"
+        for log in db.action_logs[-15:]:  # Последние 15 записей
+            timestamp = datetime.fromisoformat(log['timestamp']).strftime("%d.%m %H:%M")
+            
+            # Получаем имя пользователя
+            user_data = db.get_user(log['user_id'])
+            user_name = user_data.get('first_name', log['user_id'])
+            
+            logs_text += f"⏰ *{timestamp}*\n"
+            logs_text += f"👤 Игрок: {user_name} ({log['user_id']})\n"
+            logs_text += f"📝 Действие: {log['action_type']}\n"
+            if 'details' in log:
+                logs_text += f"ℹ️ {log['details']}\n"
+            logs_text += "\n"
+        
+        bot.send_message(message.chat.id, logs_text)
+    
+    elif log_type == "admin" and admin_level >= 2:
+        # Логи действий админов
+        if not db.admin_logs:
+            bot.send_message(message.chat.id, "📜 Логов админов нет")
+            return
+        
+        logs_text = "📜 *Логи действий админов*\n\n"
+        for log in db.admin_logs[-10:]:  # Последние 10 записей
+            timestamp = datetime.fromisoformat(log['timestamp']).strftime("%d.%m %H:%M")
+            
+            # Получаем имя админа
+            admin_user = db.get_user(log['admin_id'])
+            admin_name = admin_user.get('first_name', log['admin_id'])
+            
+            logs_text += f"⏰ *{timestamp}*\n"
+            logs_text += f"👮 Админ: {admin_name} ({log['admin_id']})\n"
+            logs_text += f"📝 Действие: {log['action']}\n"
+            if log['target_id']:
+                logs_text += f"🎯 Цель: {log['target_id']}\n"
+            if 'details' in log:
+                logs_text += f"ℹ️ {log['details']}\n"
+            logs_text += "\n"
+        
+        bot.send_message(message.chat.id, logs_text)
+
+@bot.message_handler(commands=['админы', 'admins'])
+def list_admins_command(message):
+    user = message.from_user
+    if not is_admin(user.id, 1):
+        bot.send_message(message.chat.id, "❌ Недостаточно прав!")
+        return
+    
+    admins_text = "👑 *Список администраторов*\n\n"
+    
+    for admin_id, level in ADMINS.items():
+        admin_user = db.get_user(admin_id)
+        admin_name = admin_user.get('first_name', 'Неизвестно')
+        admins_text += f"🎖️ Уровень {level}: {admin_name}\n"
+        admins_text += f"   🆔 ID: {admin_id}\n"
+        if admin_user.get('username'):
+            admins_text += f"   👤 @{admin_user['username']}\n"
+        admins_text += "\n"
+    
+    bot.send_message(message.chat.id, admins_text)
+
+@bot.message_handler(commands=['найти', 'find'])
+def find_user_command(message):
+    user = message.from_user
+    if not is_admin(user.id, 2):
+        bot.send_message(message.chat.id, "❌ Недостаточно прав!")
+        return
+    
+    parts = message.text.split()
+    if len(parts) < 2:
+        bot.send_message(message.chat.id, "❌ Формат: /найти @username/id")
+        return
+    
+    search_term = parts[1]
+    results = []
+    
+    # Поиск по ID
+    if search_term.isdigit():
+        if search_term in db.users:
+            results.append(search_term)
+    
+    # Поиск по username
+    if search_term.startswith('@'):
+        username = search_term[1:].lower()
+        for user_id, user_data in db.users.items():
+            if user_data.get('username', '').lower() == username:
+                results.append(user_id)
+    
+    # Поиск по имени
+    search_lower = search_term.lower()
+    for user_id, user_data in db.users.items():
+        if search_lower in user_data.get('first_name', '').lower():
+            results.append(user_id)
+    
+    if not results:
+        bot.send_message(message.chat.id, "❌ Пользователи не найдены")
+        return
+    
+    # Создаем инлайн клавиатуру с результатами
+    markup = types.InlineKeyboardMarkup()
+    
+    results_text = f"🔍 *Результаты поиска: '{search_term}'*\n\n"
+    
+    for i, user_id in enumerate(results[:10]):  # Показываем первые 10 результатов
+        user_data = db.get_user(user_id)
+        user_name = user_data.get('first_name', 'Неизвестно')
+        username = f"@{user_data.get('username')}" if user_data.get('username') else "Нет username"
+        
+        results_text += f"{i+1}. {user_name} ({username})\n"
+        results_text += f"   🆔 ID: {user_id}\n"
+        results_text += f"   🎣 Уровень: {user_data.get('fishing_level', 1)}\n\n"
+        
+        btn = types.InlineKeyboardButton(
+            f"{i+1}. {user_name}",
+            callback_data=f'admin_userinfo_{user_id}'
+        )
+        markup.add(btn)
+    
+    bot.send_message(message.chat.id, results_text, reply_markup=markup)
+
 # ========== АДМИН КОМАНДЫ 3 УРОВЕНЬ ==========
 @bot.message_handler(commands=['выдать', 'give'])
 def give_admin_command(message):
@@ -2240,7 +2474,7 @@ def give_admin_command(message):
     
     parts = message.text.split()
     if len(parts) < 4:
-        bot.send_message(message.chat.id, "❌ Формат: /выдать @user/id тип количество")
+        bot.send_message(message.chat.id, "❌ Формат: /выдать @username/id тип количество")
         bot.send_message(message.chat.id, "Типы: coins, bait, rod, fish, exp")
         return
     
@@ -2359,7 +2593,7 @@ def admin_stats_command(message):
     
     parts = message.text.split()
     if len(parts) < 2:
-        bot.send_message(message.chat.id, "❌ Формат: /статадмин @user/id")
+        bot.send_message(message.chat.id, "❌ Формат: /статадмин @username/id")
         return
     
     target = parts[1]
@@ -2427,11 +2661,10 @@ def admin_stats_command(message):
     
     bot.send_message(message.chat.id, stats_text)
 
-# ========== АДМИН КОМАНДЫ 5 УРОВЕНЬ ==========
 @bot.message_handler(commands=['ботстат', 'botstats'])
 def bot_stats_command(message):
     user = message.from_user
-    if not is_admin(user.id, 5):
+    if not is_admin(user.id, 4):
         bot.send_message(message.chat.id, "❌ Недостаточно прав!")
         return
     
@@ -2465,6 +2698,7 @@ def bot_stats_command(message):
     
     bot.send_message(message.chat.id, stats_text)
 
+# ========== АДМИН КОМАНДЫ 5 УРОВЕНЬ ==========
 @bot.message_handler(commands=['+админ', '+admin'])
 def add_admin_command(message):
     user = message.from_user
@@ -2474,7 +2708,7 @@ def add_admin_command(message):
     
     parts = message.text.split()
     if len(parts) < 3:
-        bot.send_message(message.chat.id, "❌ Формат: /+админ @user/id уровень")
+        bot.send_message(message.chat.id, "❌ Формат: /+админ @username/id уровень")
         return
     
     target = parts[1]
@@ -2510,7 +2744,7 @@ def remove_admin_command(message):
     
     parts = message.text.split()
     if len(parts) < 2:
-        bot.send_message(message.chat.id, "❌ Формат: /-админ @user/id")
+        bot.send_message(message.chat.id, "❌ Формат: /-админ @username/id")
         return
     
     target = parts[1]
@@ -2577,7 +2811,7 @@ def reset_user_command(message):
     
     parts = message.text.split()
     if len(parts) < 2:
-        bot.send_message(message.chat.id, "❌ Формат: /сбросить @user/id что")
+        bot.send_message(message.chat.id, "❌ Формат: /сбросить @username/id что")
         bot.send_message(message.chat.id, "Что: stats, inventory, all")
         return
     
@@ -2695,12 +2929,11 @@ def send_news_command(message):
                 f"{content}\n\n"
                 f"⏰ {datetime.fromisoformat(news_item['timestamp']).strftime('%d.%m.%Y %H:%M')}"
             )
-            bot.send_message(int(user_id), news_text)
+            bot.send_message(user_id, news_text)
             sent_count += 1
             time.sleep(0.05)  # Задержка чтобы не превысить лимиты
-        except Exception as e:
+        except:
             error_count += 1
-            print(f"Ошибка отправки новости пользователю {user_id}: {e}")
     
     response = (
         f"✅ Новость отправлена!\n\n"
@@ -2777,12 +3010,14 @@ def admin_panel_handler(message):
     
     if admin_level >= 1:
         admin_text += "• /бан @user дни причина - Забанить\n• /разбан @user - Разбанить\n• /мут @user мин причина - Замутить\n• /размут @user - Размутить\n• /пред @user причина - Предупреждение\n• /выдатьдонат @user код - Выдать донат\n"
+    if admin_level >= 2:
+        admin_text += "• /логи bans - Логи банов\n• /логи admin - Логи админов\n• /админы - Список админов\n• /найти @user - Поиск игрока\n"
     if admin_level >= 3:
         admin_text += "• /выдать @user coins сумма - Выдать монеты\n• /выдать @user bait сумма название - Выдать приманку\n• /выдать @user rod сумма название - Выдать удочку\n• /выдать @user fish сумма название - Выдать рыбу\n• /выдать @user exp сумма - Выдать опыт\n"
     if admin_level >= 4:
-        admin_text += "• /статадмин @user - Полная статистика\n"
+        admin_text += "• /статадмин @user - Полная статистика\n• /ботстат - Статистика бота\n• /сбросить @user тип - Сбросить данные\n"
     if admin_level >= 5:
-        admin_text += "• /ботстат - Статистика бота\n• /сбросить @user тип - Сбросить данные\n• /+админ @user уровень - Добавить админ\n• /-админ @user - Удалить админ\n• /очиститьлоги тип - Очистить логи\n• /news заголовок текст - Отправить новость\n• /админы - Список админов\n"
+        admin_text += "• /+админ @user уровень - Добавить админ\n• /-админ @user - Удалить админ\n• /очиститьлоги тип - Очистить логи\n• /news заголовок текст - Отправить новость\n"
     
     admin_text += "\nВыберите действие:"
     
@@ -2802,8 +3037,8 @@ def admin_ban_menu_handler(message):
     bot.send_message(message.chat.id, 
                     "🚫 *Управление банами*\n\n"
                     "📋 Команды:\n"
-                    "/бан @user дни причина - Забанить\n"
-                    "/разбан @user - Разбанить\n\n"
+                    "/бан @username дни причина - Забанить\n"
+                    "/разбан @username - Разбанить\n\n"
                     "Пример:\n"
                     "/бан @user 7 неадекват\n"
                     "/разбан @user",
@@ -2818,8 +3053,8 @@ def admin_mute_menu_handler(message):
     bot.send_message(message.chat.id,
                     "🔇 *Управление мутами*\n\n"
                     "📋 Команды:\n"
-                    "/мут @user минуты причина - Замутить\n"
-                    "/размут @user - Размутить\n\n"
+                    "/мут @username минуты причина - Замутить\n"
+                    "/размут @username - Размутить\n\n"
                     "Пример:\n"
                     "/мут @user 60 флуд\n"
                     "/размут @user",
@@ -2834,7 +3069,7 @@ def admin_warn_menu_handler(message):
     bot.send_message(message.chat.id,
                     "⚠️ *Выдача предупреждений*\n\n"
                     "📋 Команда:\n"
-                    "/пред @user причина - Предупреждение\n\n"
+                    "/пред @username причина - Предупреждение\n\n"
                     "Пример:\n"
                     "/пред @user спам\n\n"
                     "2 предупреждения = автоматический бан",
@@ -2849,7 +3084,7 @@ def admin_donate_menu_handler(message):
     bot.send_message(message.chat.id,
                     "💰 *Выдача донат-пакетов*\n\n"
                     "📋 Команда:\n"
-                    "/выдатьдонат @user код_пакета\n\n"
+                    "/выдатьдонат @username код_пакета\n\n"
                     "📦 *Коды пакетов:*\n"
                     "299RUBUNBR - Нерушимость удочки\n"
                     "200RUBLUCK - Удача +20%\n"
@@ -2866,6 +3101,38 @@ def admin_donate_menu_handler(message):
                     "1999RUBLEG - Легендарный набор\n\n"
                     "Пример:\n"
                     "/выдатьдонат @user 299RUBUNBR",
+                    reply_markup=create_admin_keyboard(get_admin_level(user.id)))
+
+@bot.message_handler(func=lambda msg: msg.text == '📜 Логи банов')
+def admin_logs_handler(message):
+    user = message.from_user
+    if not is_admin(user.id, 2):
+        return
+    
+    logs_admin_command(message)
+
+@bot.message_handler(func=lambda msg: msg.text == '📋 Список админов')
+def admin_list_handler(message):
+    user = message.from_user
+    if not is_admin(user.id, 1):
+        return
+    
+    list_admins_command(message)
+
+@bot.message_handler(func=lambda msg: msg.text == '👤 Поиск игрока')
+def admin_find_handler(message):
+    user = message.from_user
+    if not is_admin(user.id, 2):
+        return
+    
+    bot.send_message(message.chat.id,
+                    "👤 *Поиск игрока*\n\n"
+                    "📋 Команда:\n"
+                    "/найти @username/id/имя\n\n"
+                    "Пример:\n"
+                    "/найти @user\n"
+                    "/найти id\n"
+                    "/найти Иван",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
 @bot.message_handler(func=lambda msg: msg.text == '🎣 Выдать предметы')
@@ -2915,6 +3182,14 @@ def admin_exp_handler(message):
                     "/выдать @user exp 1000",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
+@bot.message_handler(func=lambda msg: msg.text == '📊 Статистика бота')
+def admin_botstats_handler(message):
+    user = message.from_user
+    if not is_admin(user.id, 4):
+        return
+    
+    bot_stats_command(message)
+
 @bot.message_handler(func=lambda msg: msg.text == '👤 Полная стата')
 def admin_fullstats_handler(message):
     user = message.from_user
@@ -2924,24 +3199,16 @@ def admin_fullstats_handler(message):
     bot.send_message(message.chat.id,
                     "👤 *Полная статистика игрока*\n\n"
                     "📋 Команда:\n"
-                    "/статадмин @user/id\n\n"
+                    "/статадмин @username/id\n\n"
                     "Пример:\n"
                     "/статадмин @user\n"
                     "/статадмин id",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
-@bot.message_handler(func=lambda msg: msg.text == '📊 Статистика бота')
-def admin_botstats_handler(message):
-    user = message.from_user
-    if not is_admin(user.id, 5):
-        return
-    
-    bot_stats_command(message)
-
 @bot.message_handler(func=lambda msg: msg.text == '🔄 Сброс игрока')
 def admin_reset_handler(message):
     user = message.from_user
-    if not is_admin(user.id, 5):
+    if not is_admin(user.id, 4):
         return
     
     bot.send_message(message.chat.id,
@@ -2979,9 +3246,10 @@ def admin_full_control_handler(message):
                     "/сбросить @user all - Полный сброс\n\n"
                     "📢 Рассылка:\n"
                     "/news заголовок текст - Отправить новость всем\n\n"
-                    "📊 Статистика:\n"
-                    "/ботстат - Статистика бота\n"
-                    "/админы - Список админов",
+                    "📜 Логи:\n"
+                    "/логи actions - Все действия\n"
+                    "/логи admin - Действия админов\n"
+                    "/логи bans - Баны/разбаны",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
 @bot.message_handler(func=lambda msg: msg.text == '🗑️ Очистить логи')
@@ -3024,39 +3292,12 @@ def admin_all_logs_handler(message):
     bot.send_message(message.chat.id,
                     "📜 *Просмотр логов*\n\n"
                     "📋 Команды:\n"
-                    "Только для 5 уровня админа\n\n"
-                    "Используйте команды:\n"
-                    "/очиститьлоги - для очистки логов\n"
-                    "/ботстат - для статистики бота",
+                    "/логи actions - Все действия игроков\n"
+                    "/логи admin - Действия админов\n"
+                    "/логи bans - Баны и разбаны\n\n"
+                    "Пример:\n"
+                    "/логи actions",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
-
-@bot.message_handler(func=lambda msg: msg.text == '📋 Список админов')
-def admin_list_handler(message):
-    user = message.from_user
-    if not is_admin(user.id, 5):
-        return
-    
-    list_admins_command(message)
-
-@bot.message_handler(commands=['админы', 'admins'])
-def list_admins_command(message):
-    user = message.from_user
-    if not is_admin(user.id, 5):
-        bot.send_message(message.chat.id, "❌ Недостаточно прав!")
-        return
-    
-    admins_text = "👑 *Список администраторов*\n\n"
-    
-    for admin_id, level in ADMINS.items():
-        admin_user = db.get_user(admin_id)
-        admin_name = admin_user.get('first_name', 'Неизвестно')
-        admins_text += f"🎖️ Уровень {level}: {admin_name}\n"
-        admins_text += f"   🆔 ID: {admin_id}\n"
-        if admin_user.get('username'):
-            admins_text += f"   👤 @{admin_user['username']}\n"
-        admins_text += "\n"
-    
-    bot.send_message(message.chat.id, admins_text)
 
 # ========== CALLBACK ОБРАБОТЧИКИ ==========
 @bot.callback_query_handler(func=lambda call: True)
@@ -3195,7 +3436,7 @@ def callback_handler(call):
         
         for upgrade in ROD_UPGRADES:
             btn = types.InlineKeyboardButton(f"{upgrade['emoji']} {upgrade['name']} - {upgrade['price']}р", 
-                                           callback_data=f'buy_upgrade_{upgrade["name"].split()[0]}_{upgrade["effect"]}')
+                                           callback_data=f'buy_upgrade_{upgrade["effect"]}')
             markup.add(btn)
         
         btn_back = types.InlineKeyboardButton('🔙 Назад', callback_data='shop_back')
@@ -3299,13 +3540,8 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "❌ Ошибка покупки!")
     
     elif call.data.startswith('buy_upgrade_'):
-        parts = call.data.split('_')
-        upgrade_name = parts[2]
-        upgrade_effect = parts[3] if len(parts) > 3 else ""
-        
+        upgrade_effect = call.data[11:]
         upgrade = next((u for u in ROD_UPGRADES if u['effect'] == upgrade_effect), None)
-        if not upgrade:
-            upgrade = next((u for u in ROD_UPGRADES if u['name'].startswith(upgrade_name)), None)
         
         if not upgrade:
             bot.answer_callback_query(call.id, "❌ Улучшение не найдено!")
@@ -3645,8 +3881,8 @@ def callback_handler(call):
         donate_text += "📞 *Для получения:*\n"
         donate_text += "1. Переведите нужную сумму\n"
         donate_text += "2. Сделайте скриншот перевода\n"
-        donate_text += "3. Отправьте скриншот @Belka759\n"
-        donate_text += "4. Укажите ваш ID *узнать можно в @userinfobot * и код пакета\n\n"
+        donate_text += "3. Отправьте скриншот @\n"
+        donate_text += "4. Укажите ваш ID и код пакета\n\n"
         donate_text += "✅ После проверки вам выдадут покупку!"
         
         markup = types.InlineKeyboardMarkup(row_width=2)
@@ -3658,29 +3894,31 @@ def callback_handler(call):
         markup.add(btn1, btn2, btn3, btn4, btn5)
         
         bot.edit_message_text(donate_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    
+    # Админ функции
+    elif call.data.startswith('admin_userinfo_'):
+        user_id = call.data.split('_')[2]
+        admin_stats_command(call)
 
 # ========== ОБРАБОТКА ВСЕХ СООБЩЕНИЙ ==========
 @bot.message_handler(func=lambda message: True, content_types=['text'])
 def handle_all_messages(message):
-    # Отключено по просьбе Belka759
-    # delete_links_in_group(message)
+    delete_links_in_group(message)
     
     text = message.text
     if text in ['🎣 Начать рыбалку', '🌊 Сменить водоем', '📊 Статистика', '🎒 Инвентарь', '❓ Помощь', 
                 '🎣 Забросить удочку', '📋 Меню', '🛒 Магазин', '💰 Продать рыбу', '📜 Задания', '🏆 Топ игроков',
                 '📰 Новости', '💰 Донат', '👑 Админ панель', '🚫 Бан/Разбан', '🔇 Мут/Размут', '⚠️ Предупреждение',
-                '💰 Выдать донат', '🎣 Выдать предметы', '💰 Выдать монеты', '🌟 Выдать опыт', '👤 Полная стата',
-                '📊 Статистика бота', '🔄 Сброс игрока', '⚙️ Полное управление', '🗑️ Очистить логи', 
-                '📢 Отправить новость', '📜 Все логи', '📋 Список админов']:
+                '💰 Выдать донат', '📜 Логи банов', '📋 Список админов', '👤 Поиск игрока', '🎣 Выдать предметы',
+                '💰 Выдать монеты', '🌟 Выдать опыт', '📊 Статистика бота', '👤 Полная стата', '🔄 Сброс игрока',
+                '⚙️ Полное управление', '🗑️ Очистить логи', '📢 Отправить новость', '📜 Все логи']:
         return
     if text and text.startswith('/'):
         return
 
 @bot.message_handler(content_types=['photo', 'video', 'document', 'audio', 'voice', 'sticker'])
 def handle_media_messages(message):
-    # Отключено по просьбе Belka759
-    # delete_links_in_group(message)
-    pass
+    delete_links_in_group(message)
 
 # ========== WEBHOOK РОУТЫ ==========
 @app.route(f'/{BOT_TOKEN}', methods=['POST'])
