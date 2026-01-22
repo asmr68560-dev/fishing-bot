@@ -867,7 +867,6 @@ class UserDatabase:
         
         # Находим цену рыбы
         fish_price = 0
-        fish_rarity = ""
         for fish in FISHES:
             if fish['name'] == fish_name:
                 fish_price = fish.get('price', 0)
@@ -3682,59 +3681,76 @@ def callback_handler(call):
         bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
     
     elif call.data.startswith('sell_fish_'):
-        parts = call.data.split('_')
-        npc_index = int(parts[2])
-        fish_name = parts[3]
-        count = int(parts[4])
+        try:
+            parts = call.data.split('_')
+            npc_index = int(parts[2])
+            fish_name = parts[3]
+            count = int(parts[4])
         
-        npc = NPC_SELLERS[npc_index]
-        user_data = db.get_user(user.id)
+            # Отвечаем сразу чтобы Telegram знал что callback обработан
+            bot.answer_callback_query(call.id, "⏳ Продаем...")
         
-        # Проверяем, есть ли рыба
-        if fish_name not in user_data['inventory']['fish'] or user_data['inventory']['fish'][fish_name] < count:
-            bot.answer_callback_query(call.id, "❌ Недостаточно рыбы!")
-            return
+            npc = NPC_SELLERS[npc_index]
+            user_data = db.get_user(user.id)
         
-        # Находим цену
-        base_price = 0
-        for fish in FISHES:
-            if fish['name'] == fish_name:
-                base_price = fish.get('price', 0)
-                break
+            # Проверяем, есть ли рыба
+            if fish_name not in user_data['inventory']['fish'] or user_data['inventory']['fish'][fish_name] < count:
+                bot.answer_callback_query(call.id, "❌ Недостаточно рыбы!")
+                return
         
-        if base_price == 0:
-            bot.answer_callback_query(call.id, "❌ Ошибка определения цены!")
-            return
+            # Находим цену
+            base_price = 0
+            for fish in FISHES:
+                if fish['name'] == fish_name:
+                    base_price = fish.get('price', 0)
+                    break
         
-        # Проверяем, предпочитает ли NPC эту рыбу
-        multiplier = npc['multiplier']
-        if fish_name in npc.get('preferred_fish', []):
-            multiplier *= 1.5
+            if base_price == 0:
+                bot.answer_callback_query(call.id, "❌ Ошибка определения цены!")
+                return
         
-        total_price = int(base_price * count * multiplier)
-        
-        # Продаем
-        success, earned = db.sell_fish(user.id, fish_name, count, multiplier)
-        
-        if success:
-            db.update_quest_progress(user.id, "sell", earned)
-            db.log_action(user.id, "sell_fish", f"{fish_name} x{count} за {earned}")
-            
-            # Проверяем бонус за предпочитаемую рыбу
-            bonus_text = ""
+            # Вычисляем цену
+            multiplier = npc['multiplier']
             if fish_name in npc.get('preferred_fish', []):
-                bonus_text = "\n⭐ +50% за предпочитаемую рыбу!"
+                multiplier *= 1.5
+        
+            # Продаем
+            success, earned = db.sell_fish(user.id, fish_name, count, npc_index)
+        
+            if success:
+                db.update_quest_progress(user.id, "sell", earned)
             
-            # Обновляем сообщение
-            markup = types.InlineKeyboardMarkup()
-            btn_more = types.InlineKeyboardButton('💰 Продать еще', callback_data=f'sell_npc_{npc_index}')
-            btn_menu = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
-            markup.add(btn_more, btn_menu)
+                # Получаем обновленные данные
+                user_data = db.get_user(user.id)
             
-            text = f"💰 *Продажа успешна!*\n\n{npc['emoji']} {npc['name']}\n🐟 Продано: {fish_name} x{count}\n💵 Получено: {earned} {COINS_NAME}{bonus_text}\n💳 Всего: {user_data['coins']} {COINS_NAME}\n\n{npc['description']}"
-            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-        else:
-            bot.answer_callback_query(call.id, "❌ Ошибка продажи!")
+                bonus_text = ""
+                if fish_name in npc.get('preferred_fish', []):
+                    bonus_text = "\n⭐ +50% за предпочитаемую рыбу!"
+            
+                # Обновляем сообщение
+                markup = types.InlineKeyboardMarkup()
+                btn_more = types.InlineKeyboardButton('💰 Продать еще', callback_data=f'sell_npc_{npc_index}')
+                btn_menu = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+                markup.add(btn_more, btn_menu)
+            
+                text = (f"💰 *Продажа успешна!*\n\n"
+                       f"{npc['emoji']} {npc['name']}\n"
+                       f"🐟 Продано: {fish_name} x{count}\n"
+                       f"💵 Получено: {earned} {COINS_NAME}{bonus_text}\n"
+                       f"💳 Всего: {user_data['coins']} {COINS_NAME}\n\n"
+                       f"{npc['description']}")
+            
+                try:
+                    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+                except:
+                    # Если не удалось отредактировать, отправляем новое сообщение
+                    bot.send_message(call.message.chat.id, text, reply_markup=markup)
+            else:
+                 bot.answer_callback_query(call.id, "❌ Ошибка продажи!")
+            
+        except Exception as e:
+            print(f"❌ Ошибка в продаже: {e}")
+            bot.answer_callback_query(call.id, "❌ Ошибка! Попробуйте снова.")
     
     # Топ игроков
     elif call.data.startswith('top_'):
