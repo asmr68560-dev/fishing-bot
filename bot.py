@@ -1817,15 +1817,7 @@ def fishing_command_handler(message):
     if db.is_banned(str(user.id)):
         return
     
-    if delete_links_in_group(message):
-        return
-    
     user_id = str(user.id)
-    
-    if user_id in db.active_fishing:
-        bot.send_message(message.chat.id, "⏳ Вы уже рыбачите! Подождите...", reply_markup=create_fishing_keyboard())
-        return
-    
     user_data = db.get_user(user.id)
     
     if user_data['worms'] <= 0:
@@ -1868,84 +1860,80 @@ def fishing_command_handler(message):
         selected_bait = "🌱 Обычный червь"
         bait_used = False
     
+    # Сначала отправляем сообщение о начале рыбалки
     msg = bot.send_message(message.chat.id,
                           f"🎣 *Началась рыбалка!*\n\n"
                           f"📍 Водоем: {user_data['current_location']}\n"
                           f"🎣 Приманка: {selected_bait}\n"
-                          f"🕐 Осталось червяков: {worms_left}\n"
-                          f"⏳ Рыбалка продлится {FISHING_TIME} секунд\n\n"
-                          f"Ждите... рыба клюёт!",
+                          f"🕐 Осталось червяков: {worms_left}",
                           reply_markup=create_fishing_keyboard())
     
-    def fishing_timer():
-        time.sleep(FISHING_TIME)
-        
-        if user_id in db.active_fishing:
-            del db.active_fishing[user_id]
-        
-        # Ловим рыбу
-        caught_fish = calculate_catch(user_data, selected_bait)
-        catch_info = db.add_fish(user.id, caught_fish)
-        user_data = db.get_user(user.id)
-        
-        # Уменьшаем прочность удочки
-        current_rod = user_data['current_rod']
-        rod_status = db.degrade_rod(user.id, current_rod, random.randint(1, 10))
-        
-        # Обновляем прогресс заданий
-        db.update_quest_progress(user.id, "catch")
-        if caught_fish['rarity'] == "редкая":
-            db.update_quest_progress(user.id, "catch_rare")
-        elif caught_fish['rarity'] == "эпическая":
-            db.update_quest_progress(user.id, "catch_epic")
-        elif caught_fish['rarity'] == "легендарная":
-            db.update_quest_progress(user.id, "catch_legendary")
-        
-        rarity_emojis = {
-            'обычная': '🐟',
-            'редкая': '🐠',
-            'эпическая': '🌟',
-            'легендарная': '👑',
-            'мусор': '🗑️'
-        }
-        
-        bait_text = f"\n🎣 Использована приманка: {selected_bait}" if bait_used else ""
-        
-        # Проверяем состояние удочки
-        rod_warning = ""
-        if rod_status == "broken":
-            rod_warning = "\n\n⚡ *Внимание!* Ваша удочка сломалась!"
-        elif rod_status == "low":
-            rod_warning = "\n\n⚠️ *Внимание!* Удочка на грани поломки! Улучшите её в магазине."
-        elif rod_status == "warning":
-            rod_warning = "\n\n⚠️ Удочка изношена. Подумайте о ремонте."
-        
-        result_text = (
-            f"🎉 *Рыбалка завершена!*\n\n"
-            f"{rarity_emojis.get(caught_fish['rarity'], '🎣')} *Поймано:* {caught_fish['name']}\n"
-            f"📊 *Редкость:* {caught_fish['rarity']}\n"
-            f"⚖️ *Вес:* {catch_info['weight_display']}\n"
-            f"📍 *Место:* {catch_info['location']}\n"
-            f"{bait_text}"
-            f"{rod_warning}\n\n"
-            f"🐛 Червяков осталось: {user_data['worms']}\n"
-            f"💰 {COINS_NAME}: {user_data['coins']}\n"
-            f"🐟 Всего поймано: {user_data['total_fish']}\n\n"
-        )
-        
-        if caught_fish['rarity'] == 'легендарная':
-            result_text += "🎊 *ВАУ! Легендарная рыба!* 🎊\n\n"
-        elif caught_fish['rarity'] == 'мусор':
-            result_text += "😔 Не повезло... Попробуйте еще раз!\n\n"
-        
-        try:
-            bot.send_message(message.chat.id, result_text, reply_markup=create_main_keyboard(user.id))
-        except Exception as e:
-            print(f"Ошибка отправки: {e}")
-
-    db.active_fishing[user_id] = threading.Thread(target=fishing_timer)
-    db.active_fishing[user_id].daemon = True
-    db.active_fishing[user_id].start()
+    # НЕМЕДЛЕННО ловим рыбу (без ожидания 30 секунд)
+    caught_fish = calculate_catch(user_data, selected_bait)
+    catch_info = db.add_fish(user.id, caught_fish)
+    
+    # Обновляем данные пользователя
+    user_data = db.get_user(user.id)
+    
+    # Уменьшаем прочность удочки
+    current_rod = user_data['current_rod']
+    rod_status = db.degrade_rod(user.id, current_rod, random.randint(1, 10))
+    
+    # Обновляем прогресс заданий
+    db.update_quest_progress(user.id, "catch")
+    if caught_fish['rarity'] == "редкая":
+        db.update_quest_progress(user.id, "catch_rare")
+    elif caught_fish['rarity'] == "эпическая":
+        db.update_quest_progress(user.id, "catch_epic")
+    elif caught_fish['rarity'] == "легендарная":
+        db.update_quest_progress(user.id, "catch_legendary")
+    
+    rarity_emojis = {
+        'обычная': '🐟',
+        'редкая': '🐠',
+        'эпическая': '🌟',
+        'легендарная': '👑',
+        'мусор': '🗑️'
+    }
+    
+    bait_text = f"\n🎣 Использована приманка: {selected_bait}" if bait_used else ""
+    
+    # Проверяем состояние удочки
+    rod_warning = ""
+    if rod_status == "broken":
+        rod_warning = "\n\n⚡ *Внимание!* Ваша удочка сломалась!"
+    elif rod_status == "low":
+        rod_warning = "\n\n⚠️ *Внимание!* Удочка на грани поломки! Улучшите её в магазине."
+    elif rod_status == "warning":
+        rod_warning = "\n\n⚠️ Удочка изношена. Подумайте о ремонте."
+    
+    # Форматируем вес для отображения
+    weight = catch_info['weight']
+    if weight < 1:
+        weight_display = f"{int(weight*1000)}г"
+    else:
+        weight_display = f"{int(weight)}кг"
+    
+    result_text = (
+        f"🎉 *Рыбалка завершена!*\n\n"
+        f"{rarity_emojis.get(caught_fish['rarity'], '🎣')} *Поймано:* {caught_fish['name']}\n"
+        f"📊 *Редкость:* {caught_fish['rarity']}\n"
+        f"⚖️ *Вес:* {weight_display}\n"
+        f"📍 *Место:* {catch_info['location']}\n"
+        f"{bait_text}"
+        f"{rod_warning}\n\n"
+        f"🐛 Червяков осталось: {user_data['worms']}\n"
+        f"💰 {COINS_NAME}: {user_data['coins']}\n"
+        f"🐟 Всего поймано: {user_data['total_fish']}\n\n"
+    )
+    
+    if caught_fish['rarity'] == 'легендарная':
+        result_text += "🎊 *ВАУ! Легендарная рыба!* 🎊\n\n"
+    elif caught_fish['rarity'] == 'мусор':
+        result_text += "😔 Не повезло... Попробуйте еще раз!\n\n"
+    
+    # Отправляем результат
+    bot.send_message(message.chat.id, result_text, reply_markup=create_main_keyboard(user.id))
 
 # ========== АДМИН КОМАНДЫ 1 УРОВЕНЬ (ДОНАТ) ==========
 @bot.message_handler(commands=['выдатьдонат', 'givedonate'])
