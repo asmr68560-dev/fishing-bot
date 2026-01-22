@@ -620,18 +620,33 @@ class UserDatabase:
         return False
     
     def get_random_weight(self, weight_range):
+        """Генерация случайного веса в целых килограммах"""
         min_weight, max_weight = weight_range
-
-        min_kg = int(min_weight)
-        max_kg = int(max_weight)
-        
+    
+        # Округляем границы до целых килограммов
+        min_kg = int(math.ceil(min_weight))  # 2.5 -> 3, 0.3 -> 1
+        max_kg = int(math.floor(max_weight)) # 16.7 -> 16, 25.2 -> 25
+    
+        # Проверяем что диапазон валидный
+        if min_kg > max_kg:
+            # Если min больше max, используем среднее
+            min_kg = max_kg = int((min_weight + max_weight) / 2)
+    
+         # Гарантируем минимум 1 кг
         if min_kg < 1:
             min_kg = 1
-
+    
+        # Гарантируем что max не меньше min
+        if max_kg < min_kg:
+            max_kg = min_kg
+    
+        # Если после всех проверок min == max, возвращаем это значение
+        if min_kg == max_kg:
+            return float(min_kg)
+    
+        # Генерируем случайное целое число
         weight = random.randint(min_kg, max_kg)
-
-        weight = max(1, weight)
-
+    
         return float(weight)
     
     def add_fish(self, user_id, fish, weight=None):
