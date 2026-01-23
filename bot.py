@@ -1943,28 +1943,6 @@ def top_command(message):
     
     bot.send_message(message.chat.id, top_text, reply_markup=markup)
 
-@bot.message_handler(commands=['news', 'новости'])
-def news_command(message):
-    user = message.from_user
-    if db.is_banned(str(user.id)):
-        return
-    
-    if not db.news:
-        bot.send_message(message.chat.id, "📰 Новостей пока нет!", reply_markup=create_main_keyboard(user.id))
-        return
-    
-    # Показываем последние 5 новостей
-    news_text = "📰 *Последние новости*\n\n"
-    
-    for news_item in db.news[-5:][::-1]:  # Последние 5, в обратном порядке
-        timestamp = datetime.fromisoformat(news_item['timestamp']).strftime("%d.%m.%Y %H:%M")
-        news_text += f"📅 *{news_item['title']}*\n"
-        news_text += f"📝 {news_item['content']}\n"
-        news_text += f"⏰ {timestamp}\n\n"
-        news_text += "─" * 30 + "\n\n"
-    
-    bot.send_message(message.chat.id, news_text, reply_markup=create_main_keyboard(user.id))
-
 @bot.message_handler(commands=['donate', 'донат'])
 def donate_command(message):
     user = message.from_user
@@ -3879,7 +3857,7 @@ def admin_all_logs_handler(message):
 
 # ========== CALLBACK ОБРАБОТЧИКИ ==========
 @bot.callback_query_handler(func=lambda call: True)
-def callback_handle(call):
+def callback_handler(call):
     user = call.from_user
     
     if call.data == 'menu':
@@ -4618,24 +4596,75 @@ def callback_handle(call):
         
         bot.edit_message_text(settings_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
 
-    # ДОБАВЬТЕ ЭТОТ ОБРАБОТЧИК ПОСЛЕ ВСЕХ ОСТАЛЬНЫХ:
+
+
     elif call.data == 'support_new':
-        # Скрываем inline-клавиатуру
-        bot.delete_message(call.message.chat.id, call.message.message_id)
-        
-        # Запрашиваем сообщение для поддержки
-        msg = bot.send_message(call.message.chat.id,
-                              "💬 *Создание обращения в техподдержку*\n\n"
-                              "Опишите вашу проблему или вопрос:\n"
-                              "(Максимум 500 символов)\n\n"
-                              "❕ *Важно:*\n"
-                              "• Для вопросов по донату укажите номер транзакции\n"
-                              "• Укажите ваш ID (можно узнать в @userinfobot)\n"
-                              "• Опишите проблему максимально подробно",
-                              parse_mode="Markdown")
-        
+        # Показываем инструкцию
+        bot.send_message(
+            call.message.chat.id,
+            "💬 *Техподдержка*\n\n"
+            "Напишите ваш вопрос в ответ на это сообщение.\n"
+            "Администратор ответит в течение 24 часов.\n\n"
+            "Обязательно укажите:\n"
+            "• Ваш ID (можно узнать в @userinfobot)\n"
+            "• Что случилось\n"
+            "• Для доната - номер транзакции"
+        )
+    
         # Регистрируем следующий шаг
-        bot.register_next_step_handler(msg, process_support_ticket, user.id)
+        msg = bot.send_message(call.message.chat.id, "✏️ *Напишите ваш вопрос:*")
+    
+        from telebot.handler_backends import ContinueHandling
+        import telebot
+    
+        # Создаем функцию прямо здесь для простоты
+        def handle_support_message(m):
+            user_id = m.from_user.id
+            text = m.text
+        
+            # Просто сохраняем сообщение
+            try:
+                import json
+                with open('support_messages.txt', 'a', encoding='utf-8') as f:
+                    data = {
+                        'user_id': user_id,
+                        'username': m.from_user.username,
+                        'first_name': m.from_user.first_name,
+                        'message': text,
+                        'time': str(datetime.now())
+                    }
+                    f.write(json.dumps(data, ensure_ascii=False) + '\n')
+            
+                # Отправляем подтверждение
+                bot.send_message(
+                    m.chat.id,
+                    f"✅ *Сообщение отправлено!*\n\n"
+                    f"Администратор получил ваш вопрос:\n"
+                    f"'{text[:100]}...'\n\n"
+                    f"Ожидайте ответа в течение 24 часов.",
+                    reply_markup=create_main_keyboard(user_id)
+                )
+            
+                # Уведомляем админов
+                for admin_id in ADMINS.keys():
+                    try:
+                        bot.send_message(
+                            admin_id,
+                            f"📞 *НОВЫЙ ВОПРОС В ТЕХПОДДЕРЖКУ*\n\n"
+                            f"👤 Пользователь: {m.from_user.first_name}\n"
+                            f"📱 @{m.from_user.username or 'нет'}\n"
+                            f"🆔 ID: {user_id}\n\n"
+                            f"💬 Вопрос: {text[:500]}"
+                        )
+                    except:
+                        pass
+                    
+            except Exception as e:
+                bot.send_message(m.chat.id, f"❌ Ошибка: {str(e)}")
+    
+        # Регистрируем обработчик
+        bot.register_next_step_handler(msg, handle_support_message)
+        bot.answer_callback_query(call.id, "Напишите ваш вопрос")
 
     # Если callback не обработан
     else:
