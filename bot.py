@@ -1573,20 +1573,143 @@ def help_command(message):
         "• Поддержите развитие проекта\n"
         "• Получите уникальные улучшения\n"
         "• Ускорьте свой прогресс\n\n"
-        "Удачи на рыбалке! 🎣"
+        "Удачи на рыбалке! 🎣\n"
         " *Техподдержка:*\n"
         " Нажмите кнопку ниже для обращения\n"
-        "Администратор ответит в течении 24 часов\n"
-        "Для вопросов по донату укажите номер транзакции\n\n"
-        "Удачи на рыбалке!"
+        " Администратор ответит в течении 24 часов\n"
+        " Для вопросов по донату укажите номер транзакции\n\n"
+        " Удачи на рыбалке!"
     )
 
     markup = types.InlineKeyboardMarkup()
-    bth_support = types.InlineKeyboardButton(' Техподдержка', callback_data='support_new')
-    markup.add(bth_support)
+    btn_support = types.InlineKeyboardButton('Техподдержка', callback_data='support_new')
+    markup.add(btn_support)
     
     bot.send_message(message.chat.id, help_text, reply_markup=create_main_keyboard(message.from_user.id))
 
+# 2. Прямо после help_command добавьте process_support_ticket
+def process_support_ticket(message, user_id):
+    """Обработка создания тикета поддержки"""
+    try:
+        # Проверяем длину сообщения
+        if len(message.text) > 500:
+            bot.send_message(message.chat.id,
+                            "❌ Сообщение слишком длинное! Максимум 500 символов.\n"
+                            "Попробуйте снова через /help",
+                            reply_markup=create_main_keyboard(user_id))
+            return
+        
+        # Получаем данные пользователя
+        user_data = db.get_user(user_id)
+        user_name = user_data.get('first_name', 'Неизвестно')
+        
+        # Создаем тикет в базе данных
+        ticket = db.create_ticket(user_id, message.text)
+        
+        # 1. Отправляем подтверждение пользователю
+        confirmation_text = (
+            f"✅ *Обращение создано!*\n\n"
+            f"🆔 Номер обращения: `#{ticket['id']}`\n"
+            f"📝 Ваше сообщение: *{message.text[:100]}...*\n\n"
+            f"👮 *Что дальше:*\n"
+            f"• Администратор ответит в течение 24 часов\n"
+            f"• Вы получите уведомление с ответом\n"
+            f"• Для просмотра статуса: /моиобращения\n\n"
+            f"⏳ *Не создавайте повторные обращения по тому же вопросу*"
+        )
+        
+        bot.send_message(message.chat.id, confirmation_text, 
+                        parse_mode="Markdown",
+                        reply_markup=create_main_keyboard(user_id))
+        
+        # 2. Уведомляем всех админов 5 уровня
+        admin_notification = (
+            f"🆘 *НОВОЕ ОБРАЩЕНИЕ В ТЕХПОДДЕРЖКУ!*\n\n"
+            f"🆔 Тикет: `#{ticket['id']}`\n"
+            f"👤 Пользователь: {user_name}\n"
+            f"🆔 ID: `{user_id}`\n"
+            f"📱 Username: @{user_data.get('username', 'нет')}\n\n"
+            f"💬 *Сообщение:*\n{message.text}\n\n"
+            f"⚡ *Команды для ответа:*\n"
+            f"`/ответить {ticket['id']} ваш текст ответа`\n"
+            f"`/тикет {ticket['id']}` - посмотреть тикет\n"
+            f"`/закрыть {ticket['id']}` - закрыть тикет"
+        )
+        
+        # Отправляем всем админам 5 уровня
+        for admin_id, level in ADMINS.items():
+            if level >= 5 and str(admin_id) != str(user_id):  # Только админы 5 уровня, кроме себя
+                try:
+                    bot.send_message(admin_id, admin_notification, parse_mode="Markdown")
+                except Exception as e:
+                    print(f"Не удалось отправить уведомление админу {admin_id}: {e}")
+        
+        # Логируем действие
+        db.log_action(user_id, "create_ticket", f"Тикет #{ticket['id']}")
+        
+    except Exception as e:
+        print(f"Ошибка при создании тикета: {e}")
+        bot.send_message(message.chat.id,
+                        f"❌ Произошла ошибка при создании обращения.\n"
+                        f"Попробуйте снова позже или напишите напрямую @Belka759",
+                        reply_markup=create_main_keyboard(user_id))
+
+# 3. Затем команда для просмотра своих обращений
+@bot.message_handler(commands=['моиобращения', 'mytickets'])
+def my_tickets_command(message):
+    """Показать обращения пользователя"""
+    user = message.from_user
+    
+    # Проверка бана
+    if db.is_banned(str(user.id)):
+        return
+    
+    tickets = db.get_user_tickets(str(user.id))
+    
+    if not tickets:
+        bot.send_message(message.chat.id,
+                        "📋 *У вас нет активных обращений*\n\n"
+                        "Чтобы создать обращение:\n"
+                        "1. Нажмите ❓ Помощь\n"
+                        "2. Выберите кнопку 'Техподдержка'\n"
+                        "3. Опишите вашу проблему",
+                        parse_mode="Markdown",
+                        reply_markup=create_main_keyboard(user.id))
+        return
+    
+    text = "📋 *Ваши обращения в техподдержку*\n\n"
+    
+    # Сортируем по дате (последние сначала)
+    tickets.sort(key=lambda x: x['created_at'], reverse=True)
+    
+    for ticket in tickets[:5]:  # Последние 5 обращений
+        status_emoji = "🟢" if ticket['status'] == 'open' else "🟡" if ticket['status'] == 'answered' else "🔴"
+        status_text = "Открыто" if ticket['status'] == 'open' else "Отвечено" if ticket['status'] == 'answered' else "Закрыто"
+        
+        date = datetime.fromisoformat(ticket['created_at']).strftime("%d.%m %H:%M")
+        
+        text += f"{status_emoji} *Тикет #{ticket['id']}* - {status_text}\n"
+        text += f"📅 {date}\n"
+        text += f"💬 *Сообщение:* {ticket['message'][:50]}...\n"
+        
+        if ticket['reply']:
+            # Получаем имя админа
+            admin_data = db.get_user(ticket['admin_id']) if ticket['admin_id'] else None
+            admin_name = admin_data.get('first_name', 'Администратор') if admin_data else 'Администратор'
+            
+            text += f"📤 *Ответ ({admin_name}):* {ticket['reply'][:50]}...\n"
+        
+        text += "─" * 30 + "\n\n"
+    
+    if len(tickets) > 5:
+        text += f"📊 Показано 5 из {len(tickets)} обращений\n"
+    
+    text += "\n📝 *Для создания нового обращения:* /help"
+    
+    bot.send_message(message.chat.id, text, 
+                    parse_mode="Markdown",
+                    reply_markup=create_main_keyboard(user.id))
+    
 @bot.message_handler(commands=['location', 'водоем'])
 def location_command(message):
     user = message.from_user
@@ -3756,7 +3879,7 @@ def admin_all_logs_handler(message):
 
 # ========== CALLBACK ОБРАБОТЧИКИ ==========
 @bot.callback_query_handler(func=lambda call: True)
-def callback_handler(call):
+def callback_handle(call):
     user = call.from_user
     
     if call.data == 'menu':
@@ -3995,7 +4118,7 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "❌ Ошибка покупки!")
     
     elif call.data.startswith('buy_upgrade_'):
-        upgrade_effect = call.data[11:]
+        upgrade_effect = call.data.split('_')[2]
         print(f"DEBUG: Ищем улучшение с эффектом '{upgrade_effect}'")  # для отладки
     
         upgrade = None
@@ -4494,6 +4617,25 @@ def callback_handler(call):
         )
         
         bot.edit_message_text(settings_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+
+    # ДОБАВЬТЕ ЭТОТ ОБРАБОТЧИК ПОСЛЕ ВСЕХ ОСТАЛЬНЫХ:
+    elif call.data == 'support_new':
+        # Скрываем inline-клавиатуру
+        bot.delete_message(call.message.chat.id, call.message.message_id)
+        
+        # Запрашиваем сообщение для поддержки
+        msg = bot.send_message(call.message.chat.id,
+                              "💬 *Создание обращения в техподдержку*\n\n"
+                              "Опишите вашу проблему или вопрос:\n"
+                              "(Максимум 500 символов)\n\n"
+                              "❕ *Важно:*\n"
+                              "• Для вопросов по донату укажите номер транзакции\n"
+                              "• Укажите ваш ID (можно узнать в @userinfobot)\n"
+                              "• Опишите проблему максимально подробно",
+                              parse_mode="Markdown")
+        
+        # Регистрируем следующий шаг
+        bot.register_next_step_handler(msg, process_support_ticket, user.id)
 
     # Если callback не обработан
     else:
