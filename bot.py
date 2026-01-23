@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
 # bot.py - Полный бот с keep-alive для Render
 import os
 import telebot
@@ -11,6 +11,7 @@ import threading
 import requests
 import math
 from datetime import datetime, timedelta
+from flask import Flask, request  # <-- ДОБАВЛЕНО ДЛЯ WEBHOOK
 
 # ========== CONFIGURATION ==========
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8377535372:AAGLMfn_0P_tDvpJnfv_NmW4QclM2AIojEA')
@@ -278,7 +279,7 @@ BAITS = [
     {"name": "💎 Перловка", "price": 20, "emoji": "💎", "description": "Дешевая растительная приманка", "effectiveness": 1.1, "type": "растительная"},
     {"name": "🌾 Пшеница", "price": 15, "emoji": "🌾", "description": "Зерновая приманка", "effectiveness": 1.0, "type": "растительная"},
     {"name": "🥜 Арахис", "price": 90, "emoji": "🥜", "description": "Ароматная приманка", "effectiveness": 1.7, "type": "растительная"},
-    {"name": "🧅 Чеснок", "price": 40, "emoji": "🧅", "description": "Ароматизатор для приманки", "effectiveness": 1.3, "type": "ароматизатор"},
+    {"name": "🧅 Чеснок", "price": 40, "emoji": "🧅", "description": "Ароматизатор для приманка", "effectiveness": 1.3, "type": "ароматизатор"},
     {"name": "🍯 Мед", "price": 110, "emoji": "🍯", "description": "Сладкая добавка к приманке", "effectiveness": 1.6, "type": "ароматизатор"},
     {"name": "🌿 Анис", "price": 85, "emoji": "🌿", "description": "Ароматическая приманка", "effectiveness": 1.5, "type": "ароматизатор"},
     {"name": "⭐ Спецкорм", "price": 500, "emoji": "⭐", "description": "Элитная приманка для редкой рыбы", "effectiveness": 3.0, "type": "профессиональная"}
@@ -2021,42 +2022,42 @@ def settings_command(message):
     
     bot.send_message(message.chat.id, settings_text, reply_markup=markup)
 
-    def process_nickname_input(message, user_id):
-        """Обработка ввода нового ника для топа"""
-        try:
-            new_nickname = message.text.strip()
-        
-            # Простые проверки
-            if len(new_nickname) > 20:
-                bot.send_message(message.chat.id, 
-                               "❌ Слишком длинный ник! Максимум 20 символов.",
-                               reply_markup=create_main_keyboard(user_id))
-                return
-        
-            if len(new_nickname) < 2:
-                bot.send_message(message.chat.id, 
-                               "❌ Слишком короткий ник! Минимум 2 символа.",
-                               reply_markup=create_main_keyboard(user_id))
-                return
-        
-            # Сохраняем
-            user_data = db.get_user(user_id)
-            old_nickname = user_data.get('top_nickname', user_data.get('first_name', 'Игрок'))
-            user_data['top_nickname'] = new_nickname
-            db.save_data()
-        
-            # Отправляем подтверждение
-            bot.send_message(message.chat.id,
-                            f"✅ *Ник изменен!*\n\n"
-                            f"Старый: {old_nickname}\n"
-                            f"Новый: *{new_nickname}*\n\n"
-                            f"Теперь в топе будете отображаться под этим ником!",
-                            reply_markup=create_main_keyboard(user_id))
-        
-        except Exception as e:
-            bot.send_message(message.chat.id,
-                            f"❌ Ошибка: {str(e)}\nПопробуйте снова: /настройки",
-                            reply_markup=create_main_keyboard(user_id))
+def process_nickname_input(message, user_id):
+    """Обработка ввода нового ника для топа"""
+    try:
+        new_nickname = message.text.strip()
+    
+        # Простые проверки
+        if len(new_nickname) > 20:
+            bot.send_message(message.chat.id, 
+                           "❌ Слишком длинный ник! Максимум 20 символов.",
+                           reply_markup=create_main_keyboard(user_id))
+            return
+    
+        if len(new_nickname) < 2:
+            bot.send_message(message.chat.id, 
+                           "❌ Слишком короткий ник! Минимум 2 символа.",
+                           reply_markup=create_main_keyboard(user_id))
+            return
+    
+        # Сохраняем
+        user_data = db.get_user(user_id)
+        old_nickname = user_data.get('top_nickname', user_data.get('first_name', 'Игрок'))
+        user_data['top_nickname'] = new_nickname
+        db.save_data()
+    
+        # Отправляем подтверждение
+        bot.send_message(message.chat.id,
+                        f"✅ *Ник изменен!*\n\n"
+                        f"Старый: {old_nickname}\n"
+                        f"Новый: *{new_nickname}*\n\n"
+                        f"Теперь в топе будете отображаться под этим ником!",
+                        reply_markup=create_main_keyboard(user_id))
+    
+    except Exception as e:
+        bot.send_message(message.chat.id,
+                        f"❌ Ошибка: {str(e)}\nПопробуйте снова: /настройки",
+                        reply_markup=create_main_keyboard(user_id))
 
 # ========== АДМИН КОМАНДЫ 1 УРОВЕНЬ (ДОНАТ) ==========
 @bot.message_handler(commands=['выдатьдонат', 'givedonate'])
@@ -4049,6 +4050,107 @@ def callback_handler(call):
                         f"✅ Теперь используется приманка: {bait_name}\n\n"
                         f"Нажмите '🎣 Начать рыбалку' для рыбалки с этой приманкой.",
                         reply_markup=create_main_keyboard(user.id))
+    
+    # НАСТРОЙКИ
+    elif call.data == 'settings_change_nickname':
+        msg = bot.send_message(call.message.chat.id, 
+                              "✏️ *Введите новый ник для топа:*\n\n"
+                              "Максимум 20 символов, минимум 2 символа\n"
+                              "Пример: Рыбак2024",
+                              parse_mode="Markdown")
+        bot.register_next_step_handler(msg, process_nickname_input, user.id)
+        
+    elif call.data == 'settings_toggle_hide':
+        user_data = db.get_user(user.id)
+        user_data['hide_from_top'] = not user_data.get('hide_from_top', False)
+        db.save_data()
+        
+        status = "✅ Теперь вы скрыты из топа!" if user_data['hide_from_top'] else "👁️ Теперь вы видимы в топе!"
+        bot.answer_callback_query(call.id, status)
+        
+        # Обновляем сообщение
+        nickname = user_data.get('top_nickname', user.first_name)
+        hide_from_top = user_data.get('hide_from_top', False)
+        
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        
+        btn_nickname = types.InlineKeyboardButton(
+            f'📝 Ник в топе: {nickname}', 
+            callback_data='settings_change_nickname'
+        )
+        
+        hide_text = "✅ Скрыт из топа" if hide_from_top else "❌ Виден в топе"
+        btn_hide = types.InlineKeyboardButton(
+            f'👁️ {hide_text}', 
+            callback_data='settings_toggle_hide'
+        )
+        
+        btn_reset = types.InlineKeyboardButton(
+            '🔄 Сбросить ник', 
+            callback_data='settings_reset_nickname'
+        )
+        
+        btn_back = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+        
+        markup.add(btn_nickname, btn_hide, btn_reset, btn_back)
+        
+        settings_text = (
+            f"⚙️ *Настройки профиля*\n\n"
+            f"👤 Ваш ник в топе: *{nickname}*\n"
+            f"👁️ Статус в топе: {'*Скрыт* 👻' if hide_from_top else '*Виден* 👁️'}\n\n"
+            f"*Доступные действия:*\n"
+            f"• Изменить ник для топа\n"
+            f"• Скрыться из общего топа\n"
+            f"• Сбросить ник к имени\n"
+        )
+        
+        bot.edit_message_text(settings_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+        
+    elif call.data == 'settings_reset_nickname':
+        user_data = db.get_user(user.id)
+        old_nickname = user_data.get('top_nickname', user.first_name)
+        user_data['top_nickname'] = None
+        db.save_data()
+        
+        bot.answer_callback_query(call.id, f"✅ Ник сброшен к имени: {user.first_name}")
+        
+        # Обновляем сообщение
+        nickname = user.first_name
+        hide_from_top = user_data.get('hide_from_top', False)
+        
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        
+        btn_nickname = types.InlineKeyboardButton(
+            f'📝 Ник в топе: {nickname}', 
+            callback_data='settings_change_nickname'
+        )
+        
+        hide_text = "✅ Скрыт из топа" if hide_from_top else "❌ Виден в топе"
+        btn_hide = types.InlineKeyboardButton(
+            f'👁️ {hide_text}', 
+            callback_data='settings_toggle_hide'
+        )
+        
+        btn_reset = types.InlineKeyboardButton(
+            '🔄 Сбросить ник', 
+            callback_data='settings_reset_nickname'
+        )
+        
+        btn_back = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+        
+        markup.add(btn_nickname, btn_hide, btn_reset, btn_back)
+        
+        settings_text = (
+            f"⚙️ *Настройки профиля*\n\n"
+            f"👤 Ваш ник в топе: *{nickname}*\n"
+            f"👁️ Статус в топе: {'*Скрыт* 👻' if hide_from_top else '*Виден* 👁️'}\n\n"
+            f"*Доступные действия:*\n"
+            f"• Изменить ник для топа\n"
+            f"• Скрыться из общего топа\n"
+            f"• Сбросить ник к имени\n"
+        )
+        
+        bot.edit_message_text(settings_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
 
     # Если callback не обработан
     else:
@@ -4074,7 +4176,126 @@ def handle_all_messages(message):
 def handle_media_messages(message):
     delete_links_in_group(message)
 
-# ========== WEBHOOK РОУТЫ ==========
+# ========== FLASK WEBHOOK СЕРВЕР ==========
+# Создаем Flask приложение
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    """Главная страница для проверки работы"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>🎣 Fishing Bot</title>
+        <meta charset="utf-8">
+        <style>
+            body {
+                font-family: 'Arial', sans-serif;
+                text-align: center;
+                padding: 40px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                min-height: 100vh;
+                margin: 0;
+            }
+            .container {
+                max-width: 800px;
+                margin: 0 auto;
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                border-radius: 20px;
+                padding: 40px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            }
+            h1 {
+                font-size: 3em;
+                margin-bottom: 20px;
+                text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+            }
+            .stats {
+                display: flex;
+                justify-content: space-around;
+                flex-wrap: wrap;
+                margin: 30px 0;
+            }
+            .stat-card {
+                background: rgba(255, 255, 255, 0.15);
+                border-radius: 15px;
+                padding: 20px;
+                margin: 10px;
+                flex: 1;
+                min-width: 150px;
+                transition: transform 0.3s;
+            }
+            .stat-card:hover {
+                transform: translateY(-5px);
+            }
+            .stat-value {
+                font-size: 2em;
+                font-weight: bold;
+                margin: 10px 0;
+            }
+            .btn {
+                display: inline-block;
+                margin: 15px;
+                padding: 15px 30px;
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+                text-decoration: none;
+                border-radius: 50px;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+                transition: all 0.3s;
+                font-weight: bold;
+            }
+            .btn:hover {
+                background: rgba(255, 255, 255, 0.3);
+                transform: scale(1.05);
+            }
+            .footer {
+                margin-top: 40px;
+                opacity: 0.8;
+                font-size: 0.9em;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🎣 Fishing Bot</h1>
+            <p>Бот для виртуальной рыбалки в Telegram</p>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <div>👥 Пользователей</div>
+                    <div class="stat-value">""" + str(len(db.users)) + """</div>
+                </div>
+                <div class="stat-card">
+                    <div>🎣 Рыбы</div>
+                    <div class="stat-value">""" + str(len(FISHES)) + """</div>
+                </div>
+                <div class="stat-card">
+                    <div>🌊 Водоемов</div>
+                    <div class="stat-value">""" + str(len(WATER_BODIES)) + """</div>
+                </div>
+            </div>
+            
+            <div>
+                <a href="/set_webhook" class="btn">🔄 Установить Webhook</a>
+                <a href="/health" class="btn">❤️ Проверка здоровья</a>
+                <a href="/status" class="btn">📊 Статус</a>
+            </div>
+            
+            <div class="footer">
+                <p>🤖 Бот работает в webhook режиме</p>
+                <p>📞 Поддержка: @Belka759</p>
+                <p>© 2024 Fishing Bot</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """, 200
+
+@app.route(f'/{BOT_TOKEN}', methods=['POST'])
 def webhook():
     """Основной endpoint для получения обновлений от Telegram"""
     if request.headers.get('content-type') == 'application/json':
@@ -4084,20 +4305,25 @@ def webhook():
         return 'ok', 200
     return 'error', 403
 
-def home():
-    return "🎣 Fishing Bot is running! Use /set_webhook to configure", 200
-
+@app.route('/set_webhook', methods=['GET'])
 def set_webhook():
-    """Установка webhook (вызовите этот URL один раз)"""
+    """Установка webhook"""
     if not WEBHOOK_URL:
-        return "❌ RENDER_EXTERNAL_URL не настроен", 500
+        return """
+        <html>
+        <head><title>❌ Ошибка</title></head>
+        <body style="text-align: center; padding: 50px; font-family: Arial;">
+            <h1>❌ Ошибка</h1>
+            <p>RENDER_EXTERNAL_URL не настроен в переменных окружения</p>
+            <p>Добавьте переменную RENDER_EXTERNAL_URL в настройках Render</p>
+        </body>
+        </html>
+        """, 500
     
     try:
-        # Удаляем старый webhook
         bot.remove_webhook()
         time.sleep(0.1)
         
-        # Устанавливаем новый с ВСЕМИ типами обновлений
         s = bot.set_webhook(
             url=WEBHOOK_URL,
             max_connections=50,
@@ -4105,24 +4331,77 @@ def set_webhook():
         )
         
         if s:
-            return f"✅ Webhook установлен!\nURL: {WEBHOOK_URL}", 200
+            return f"""
+            <html>
+            <head>
+                <title>✅ Webhook установлен</title>
+                <style>
+                    body {{
+                        font-family: Arial, sans-serif;
+                        text-align: center;
+                        padding: 50px;
+                        background: #f0f9ff;
+                    }}
+                    .success {{
+                        background: white;
+                        padding: 40px;
+                        border-radius: 15px;
+                        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+                        max-width: 800px;
+                        margin: 0 auto;
+                    }}
+                    .url-box {{
+                        background: #e8f5e9;
+                        padding: 20px;
+                        border-radius: 10px;
+                        margin: 20px 0;
+                        word-break: break-all;
+                        font-family: monospace;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div class="success">
+                    <h1>✅ Webhook установлен!</h1>
+                    <div class="url-box">
+                        <strong>URL:</strong><br>{WEBHOOK_URL}
+                    </div>
+                    <p>Бот готов к работе! Теперь отправьте команду /start в Telegram</p>
+                    <p><a href="/" style="color: #3498db;">Вернуться на главную</a></p>
+                </div>
+            </body>
+            </html>
+            """, 200
         else:
-            return "❌ Ошибка установки webhook", 500
+            return """
+            <html>
+            <body style="text-align: center; padding: 50px;">
+                <h1>❌ Ошибка установки webhook</h1>
+                <p>Не удалось установить webhook. Проверьте токен бота и URL.</p>
+            </body>
+            </html>
+            """, 500
     except Exception as e:
-        return f"❌ Ошибка: {str(e)}", 500
+        return f"""
+        <html>
+        <body style="text-align: center; padding: 50px;">
+            <h1>❌ Ошибка</h1>
+            <p>{str(e)}</p>
+        </body>
+        </html>
+        """, 500
 
-def remove_webhook():
-    """Удаление webhook (если нужно перейти на polling)"""
-    try:
-        bot.remove_webhook()
-        return "✅ Webhook удален", 200
-    except Exception as e:
-        return f"❌ Ошибка: {str(e)}", 500
-
+@app.route('/health')
 def health():
-    """Эндпоинт для проверки здоровья и keep-alive"""
-    return "OK", 200
+    """Проверка здоровья"""
+    return json.dumps({
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "users": len(db.users),
+        "webhook": WEBHOOK_URL is not None
+    }, ensure_ascii=False), 200
 
+@app.route('/status')
 def status():
     """Статус бота"""
     try:
@@ -4130,6 +4409,7 @@ def status():
         return json.dumps({
             "status": "running",
             "bot": f"@{bot_info.username}",
+            "bot_name": bot_info.first_name,
             "webhook": WEBHOOK_URL,
             "users_count": len(db.users),
             "admins_count": len(ADMINS),
@@ -4137,40 +4417,33 @@ def status():
             "baits_count": len(BAITS),
             "rods_count": len(RODS),
             "timestamp": datetime.now().isoformat()
-        }, ensure_ascii=False)
+        }, ensure_ascii=False, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)}), 500
 
-# ========== ЗАПУСК ПРИЛОЖЕНИЯ ==========
+# ========== ЗАПУСК ==========
 if __name__ == '__main__':
     print("=" * 50)
-    print("🎣 Fishing Bot Polling Edition - Instant Fishing")
+    print("🎣 Fishing Bot Webhook Edition")
     print("=" * 50)
     
     try:
-        # Получаем информацию о боте
         bot_info = bot.get_me()
         print(f"✅ Бот загружен: @{bot_info.username} ({bot_info.first_name})")
     except Exception as e:
         print(f"❌ Ошибка загрузки бота: {e}")
     
-    print(f"👑 Админы: {len(ADMINS)} пользователей")
-    print(f"🌊 Водоемов: {len(WATER_BODIES)}")
-    print(f"🐟 Рыб: {len(FISHES)} видов")
-    print(f"🪱 Приманок: {len(BAITS)} видов")
-    print(f"🎣 Удочек: {len(RODS)} видов")
-    print(f"⚙️ Улучшений: {len(ROD_UPGRADES)}")
-    print(f"💰 Донат-пакетов: {len(DONATE_PACKAGES)}")
     print(f"👥 Пользователей в базе: {len(db.users)}")
-
-    try:
-        bot.remove_webhook()
-        print("Webhook очищен")
-        time.sleep(0.1)
-    except:
-        pass
+    print(f"🌍 Webhook URL: {WEBHOOK_URL}")
     
-    print(" Запуск бота в режиме polling...")
-    print(" Бот запуще! Ожидайте сообщений...")
-
-    bot.polling(none_stop=True, interval=0 ,timeout=20)
+    if WEBHOOK_URL:
+        print("🚀 Запуск в webhook режиме...")
+        print(f"📞 Для установки webhook откройте: {RENDER_URL}/set_webhook")
+    else:
+        print("⚠️ RENDER_EXTERNAL_URL не настроен, бот будет работать без webhook")
+    
+    print("🔄 Запуск Flask сервера...")
+    
+    # Получаем порт из переменных окружения Render
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
