@@ -3990,9 +3990,21 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "❌ Удочка не найдена!")
             return
         
+            
+        print("🎮 Игрок зашёл в магазин улучшений")
+        print(f"🎣 У него удочка: {current_rod}")
+        print(f"💰 Денег: {user_data['coins']}")
+        print("🛠️ Создаю кнопки улучшений:")
+
+        # ВОТ ЭТОТ ЦИКЛ (оставь его как есть):
         for upgrade in ROD_UPGRADES:
-            btn = types.InlineKeyboardButton(f"{upgrade['emoji']} {upgrade['name']} - {upgrade['price']}р", 
-                                           callback_data=f'buy_upgrade_{upgrade["effect"]}')
+            print(f"  ➡️ Кнопка: {upgrade['name']}")
+            print(f"    📞 Когда нажмут, отправлю: 'buy_upgrade_{upgrade['effect']}'")
+    
+            btn = types.InlineKeyboardButton(
+                f"{upgrade['emoji']} {upgrade['name']} - {upgrade['price']}р", 
+                callback_data=f'buy_upgrade_{upgrade["effect"]}'
+            )
             markup.add(btn)
         
         btn_back = types.InlineKeyboardButton('🔙 Назад', callback_data='shop_back')
@@ -4096,77 +4108,84 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, "❌ Ошибка покупки!")
     
     elif call.data.startswith('buy_upgrade_'):
-        upgrade_effect = call.data.split('_')[2]
-        print(f"DEBUG: Ищем улучшение с эффектом '{upgrade_effect}'")  # для отладки
+        print("🔥 НАЖАТА КНОПКА УЛУЧШЕНИЯ!")
+        print(f"📱 Получено: {call.data}")
     
+        # Что пришло? "buy_upgrade_repair_50" или "buy_upgrade_durability_10"
+        # Берем часть после "buy_upgrade_"
+        upgrade_key = call.data.replace('buy_upgrade_', '')  # Убираем "buy_upgrade_"
+        print(f"🔑 Ключ улучшения: '{upgrade_key}'")
+    
+        # Список всех улучшений из базы
+        print("📋 Все улучшения в игре:")
+        for i, up in enumerate(ROD_UPGRADES):
+            print(f"  {i+1}. {up['name']} -> эффект: '{up['effect']}'")
+    
+        # Ищем улучшение
         upgrade = None
-        for u in ROD_UPGRADES:
-            if u['effect'] == upgrade_effect:
-                upgrade = u
+        for up in ROD_UPGRADES:
+            if up['effect'] == upgrade_key:  # Сравниваем эффекты
+                upgrade = up
+                print(f"✅ Нашёл! Это {up['name']}")
                 break
     
         if not upgrade:
-            print(f"DEBUG: Улучшение не найдено. Доступные: {[u['effect'] for u in ROD_UPGRADES]}")
+            print(f"❌ Не нашёл улучшение с ключом '{upgrade_key}'!")
+            print("🤔 Возможные причины:")
+            print("1. Нет такого эффекта в списке ROD_UPGRADES")
+            print("2. Опечатка в названии")
+            print("3. Пробелы в тексте")
             bot.answer_callback_query(call.id, "❌ Улучшение не найдено!")
             return
     
+        # Если нашли - продолжаем покупку
         user_data = db.get_user(user.id)
         current_rod = user_data['current_rod']
-        rod_data = db.get_user_rod(user.id, current_rod)
-    
-        if not rod_data:
-            bot.answer_callback_query(call.id, "❌ Удочка не найдена!")
-            return
-    
+
         if user_data['coins'] < upgrade['price']:
-            bot.answer_callback_query(call.id, f"❌ Недостаточно {COINS_NAME}! Нужно {upgrade['price']}, у вас {user_data['coins']}")
+            bot.answer_callback_query(call.id, f"❌ Не хватает денег! Нужно {upgrade['price']}")
             return
     
+        # Покупаем
         success, new_balance = db.remove_coins(user.id, upgrade['price'])
         if success:
-            if upgrade_effect == 'repair_50':
-                new_durability = db.repair_rod(user.id, current_rod, 50)
-                db.log_action(user.id, "repair_rod", f"{current_rod} +50")
-                result_text = f"🔧 Прочность восстановлена на 50 единиц. Теперь: {new_durability}/{rod_data['max_durability']}"
-            elif upgrade_effect == 'durability_10':
-                rod_data['max_durability'] = int(rod_data['max_durability'] * 1.1)
-                rod_data['durability'] = int(rod_data['durability'] * 1.1)
-                db.save_data()
-                db.log_action(user.id, "upgrade_durability", f"{current_rod} +10%")
-                result_text = f"⚙️ Максимальная прочность увеличена на 10%"
-            elif upgrade_effect == 'durability_20':
-                rod_data['max_durability'] = int(rod_data['max_durability'] * 1.2)
-                rod_data['durability'] = int(rod_data['durability'] * 1.2)
-                db.save_data()
-                db.log_action(user.id, "upgrade_durability", f"{current_rod} +20%")
-                result_text = f"💎 Максимальная прочность увеличена на 20%"
-            elif upgrade_effect == 'luck_10':
+            print(f"💰 Куплено {upgrade['name']} за {upgrade['price']}")
+        
+            # Применяем улучшение
+            if upgrade['effect'] == 'repair_50':
+                db.repair_rod(user.id, current_rod, 50)
+                result = "🔧 Прочность +50"
+            elif upgrade['effect'] == 'durability_10':
                 db.upgrade_rod(user.id, current_rod, "luck_10")
-                db.log_action(user.id, "upgrade_luck", f"{current_rod} +10%")
-                result_text = f"🌟 Удача увеличена на 10%"
-            elif upgrade_effect == 'luck_20':
+                result = "⚙️ Прочность +10%"
+            elif upgrade['effect'] == 'durability_20':
+                db.upgrade_rod(user.id, current_rod, "luck_20") 
+                result = "💎 Прочность +20%"
+            elif upgrade['effect'] == 'luck_10':
+                db.upgrade_rod(user.id, current_rod, "luck_10")
+                result = "🌟 Удача +10%"
+            elif upgrade['effect'] == 'luck_20':
                 db.upgrade_rod(user.id, current_rod, "luck_20")
-                db.log_action(user.id, "upgrade_luck", f"{current_rod} +20%")
-                result_text = f"✨ Удача увеличена на 20%"
-            elif upgrade_effect == 'luck_30':
+                result = "✨ Удача +20%"
+            elif upgrade['effect'] == 'luck_30':
                 db.upgrade_rod(user.id, current_rod, "luck_30")
-                db.log_action(user.id, "upgrade_luck", f"{current_rod} +30%")
-                result_text = f"🔮 Удача увеличена на 30%"
-            elif upgrade_effect == 'unbreakable':
+                result = "🔮 Удача +30%"
+            elif upgrade['effect'] == 'unbreakable':
                 db.upgrade_rod(user.id, current_rod, "unbreakable")
-                db.log_action(user.id, "upgrade_unbreakable", current_rod)
-                result_text = f"🛡️ Удочка теперь нерушима!"
+                result = "🛡️ Удочка не ломается!"
             else:
-                result_text = "✅ Улучшение применено"
+                result = "✅ Улучшение применено"
         
-            # Обновляем сообщение
-            markup = types.InlineKeyboardMarkup()
-            btn_back = types.InlineKeyboardButton('🛒 Продолжить покупки', callback_data='shop_upgrades')
-            btn_menu = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
-            markup.add(btn_back, btn_menu)
-        
-            text = f"✅ *Улучшение применено!*\n\n{upgrade['emoji']} {upgrade['name']}\n{result_text}\n\n💰 Потрачено: {upgrade['price']} {COINS_NAME}\n💳 Осталось: {new_balance} {COINS_NAME}"
-            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+            # Сообщаем игроку
+            bot.send_message(
+                call.message.chat.id,
+                f"✅ *Куплено!*\n\n"
+                f"{upgrade['emoji']} {upgrade['name']}\n"
+                f"{result}\n\n"
+                f"💰 Потрачено: {upgrade['price']} {COINS_NAME}\n"
+                f"💳 Осталось: {new_balance} {COINS_NAME}",
+                reply_markup=create_main_keyboard(user.id)
+            )
         else:
             bot.answer_callback_query(call.id, "❌ Ошибка покупки!")
     
