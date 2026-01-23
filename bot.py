@@ -4421,7 +4421,7 @@ def status():
     except Exception as e:
         return json.dumps({"error": str(e)}), 500
 
-# ========== ЗАПУСК ==========
+# ========== ЗАПУСК СЕРВЕРА ==========
 def run():
     print("=" * 50)
     print("🎣 Fishing Bot Webhook Edition")
@@ -4432,6 +4432,7 @@ def run():
         print(f"✅ Бот загружен: @{bot_info.username} ({bot_info.first_name})")
     except Exception as e:
         print(f"❌ Ошибка загрузки бота: {e}")
+        return
     
     print(f"👥 Пользователей в базе: {len(db.users)}")
     print(f"🌍 Webhook URL: {WEBHOOK_URL}")
@@ -4439,15 +4440,44 @@ def run():
     if WEBHOOK_URL:
         print("🚀 Запуск в webhook режиме...")
         print(f"📞 Для установки webhook откройте: {RENDER_URL}/set_webhook")
+        print("ℹ️ После установки webhook бот начнет отвечать на сообщения")
+        
+        # Попробуем автоматически установить webhook
+        try:
+            print("🔄 Пытаюсь автоматически установить webhook...")
+            bot.remove_webhook()
+            time.sleep(0.1)
+            s = bot.set_webhook(
+                url=WEBHOOK_URL,
+                max_connections=50,
+                allowed_updates=["message", "callback_query", "inline_query"]
+            )
+            if s:
+                print("✅ Webhook успешно установлен автоматически!")
+            else:
+                print("⚠️ Не удалось установить webhook автоматически")
+                print(f"   Установите вручную через: {RENDER_URL}/set_webhook")
+        except Exception as e:
+            print(f"⚠️ Ошибка при автоматической установке webhook: {e}")
+            print(f"ℹ️ Установите webhook вручную через: {RENDER_URL}/set_webhook")
     else:
         print("⚠️ RENDER_EXTERNAL_URL не настроен, бот будет работать без webhook")
     
-    print("🔄 Запуск сервера...")
-
-    port = int(os.environ.get('PORT',10000))
+    print("🔄 Запуск сервера Waitress...")
     
-    from waitress import serve
-    serve(app, host='0.0.0.0', port=port)
+    # Получаем порт из переменных окружения Render
+    port = int(os.environ.get('PORT', 10000))
+    print(f"🌐 Сервер запущен на порту: {port}")
+    
+    try:
+        from waitress import serve
+        print(f"🚀 Waitress запущен на http://0.0.0.0:{port}")
+        serve(app, host='0.0.0.0', port=port)
+    except ImportError:
+        print("❌ Ошибка: waitress не установлен!")
+        print("💡 Установите: pip install waitress")
+        print("🔄 Использую стандартный Flask сервер...")
+        app.run(host='0.0.0.0', port=port, debug=False)
 
 if __name__ == '__main__':
     run()
