@@ -440,6 +440,7 @@ class UserDatabase:
         self.action_logs = []
         self.news = []
         self.donate_transactions = []
+        self.support_tickets = []
         self.load_data()
         self.load_logs()
     
@@ -548,6 +549,51 @@ class UserDatabase:
         }
         self.donate_transactions.append(log_entry)
         self.save_data()
+
+    def create_ticket(self, user_id, message, category="Общий"):
+        """Создать новый тикет"""
+        ticket_id = len(self.support_tickets) + 1
+        ticket = {
+            "id": ticket_id,
+            "user_id": str(user_id),
+            "category": category,
+            "message": message,
+            "status": "open",  # open, answered, closed
+            "admin_id": None,
+            "reply": None,
+            "created_at": datetime.now().isoformat()
+        }
+        self.support_tickets.append(ticket)
+        self.save_data()
+        return ticket
+
+    def get_user_tickets(self, user_id):
+        """Получить тикеты пользователя"""
+        return [t for t in self.support_tickets if t['user_id'] == str(user_id)]
+
+    def get_open_tickets(self):
+        """Получить открытые тикеты"""
+        return [t for t in self.support_tickets if t['status'] == 'open']
+
+    def answer_ticket(self, ticket_id, admin_id, reply_text):
+        """Ответить на тикет"""
+        for ticket in self.support_tickets:
+            if ticket['id'] == ticket_id:
+                ticket['status'] = 'answered'
+                ticket['admin_id'] = str(admin_id)
+                ticket['reply'] = reply_text
+                self.save_data()
+                return True
+        return False
+
+    def close_ticket(self, ticket_id):
+        """Закрыть тикет"""
+        for ticket in self.support_tickets:
+            if ticket['id'] == ticket_id:
+                ticket['status'] = 'closed'
+                self.save_data()
+                return True
+        return False
     
     def add_news(self, title, content, author_id):
         """Добавляем новость"""
@@ -1460,6 +1506,23 @@ def start_command(message):
 
 @bot.message_handler(commands=['help'])
 def help_command(message):
+    user = message.from_user
+    user_data = db.get_user(user.id)
+    
+    if db.is_banned(str(user.id)):
+        ban_time_left = db.get_ban_time_left(user.id)
+        days_left = int(ban_time_left // 86400)
+        hours_left = int((ban_time_left % 86400) // 3600)
+        minutes_left = int((ban_time_left % 3600) // 60)
+        
+        ban_text = (
+            f"🚫 {user.first_name}, ты забанен!\n\n"
+            f"⏳ Бан истечет через: {days_left}д {hours_left}ч {minutes_left}мин\n"
+            f"Ожидайте окончания бана для продолжения игры."
+        )
+        bot.send_message(message.chat.id, ban_text)
+        return
+
     help_text = (
         "🎣 *Помощь по игре \"Рыбалка\"*\n\n"
         "📋 *Основные команды:*\n"
@@ -1511,7 +1574,16 @@ def help_command(message):
         "• Получите уникальные улучшения\n"
         "• Ускорьте свой прогресс\n\n"
         "Удачи на рыбалке! 🎣"
+        " *Техподдержка:*\n"
+        " Нажмите кнопку ниже для обращения\n"
+        "Администратор ответит в течении 24 часов\n"
+        "Для вопросов по донату укажите номер транзакции\n\n"
+        "Удачи на рыбалке!"
     )
+
+    markup = types.InlineKeyboardMarkup()
+    bth_support = types.InlineKeyboardButton(' Техподдержка', callback_data='support_new')
+    markup.add(bth_support)
     
     bot.send_message(message.chat.id, help_text, reply_markup=create_main_keyboard(message.from_user.id))
 
@@ -3012,7 +3084,7 @@ def reset_user_command(message):
     db.log_admin_action(user.id, "reset", target_id, reset_type)
     bot.send_message(message.chat.id, response)
 
-@bot.message_handler(commands=['news', 'новость'])
+@bot.message_handler(commands=['send_news', 'Отправить новость', 'новость'])
 def send_news_command(message):
     user = message.from_user
     if not is_admin(user.id, 5):
@@ -3056,6 +3128,268 @@ def send_news_command(message):
     
     bot.send_message(message.chat.id, response)
 
+@bot.message_handler(commands=['news', 'новости'])
+def public_news_command(message):
+    user = message.from_user
+    
+    # Проверка бана
+    if db.is_banned(str(user.id)):
+        return
+    
+    # Если нет новостей
+    if not db.news:
+        bot.send_message(message.chat.id, 
+                        "📰 *Новостей пока нет!*\n\n"
+                        "Следите за обновлениями!",
+                        reply_markup=create_main_keyboard(user.id))
+        return
+    
+    # Показываем новости
+    text = "📰 *Последние новости*\n\n"
+    
+    # Берем 3 последние новости
+    for news in db.news[-3:][::-1]:
+        date = datetime.fromisoformat(news['timestamp']).strftime("%d.%m.%Y %H:%M")
+        text += f"📅 *{news['title']}*\n"
+        text += f"📝 {news['content']}\n"
+        text += f"⏰ {date}\n\n"
+        text += "─" * 30 + "\n\n"
+    
+    bot.send_message(message.chat.id, text, reply_markup=create_main_keyboard(user.id))
+
+# ========== АДМИНСКИЕ КОМАНДЫ ДЛЯ ТЕХПОДДЕРЖКИ ==========
+
+@bot.message_handler(commands=['тикеты', 'tickets'])
+def show_tickets_command(message):
+    """Показать все обращения (только админы 5 уровня)"""
+    user = message.from_user
+    
+    # Проверяем что это админ 5 уровня
+    if not is_admin(user.id, 5):
+        bot.send_message(message.chat.id, "❌ Эта команда только для админов 5 уровня!")
+        return
+    
+    # Получаем все тикеты
+    tickets = db.support_tickets
+    
+    if not tickets:
+        bot.send_message(message.chat.id, "📋 Обращений в техподдержку нет.")
+        return
+    
+    # Считаем сколько тикетов каждого статуса
+    open_tickets = [t for t in tickets if t['status'] == 'open']
+    answered_tickets = [t for t in tickets if t['status'] == 'answered']
+    closed_tickets = [t for t in tickets if t['status'] == 'closed']
+    
+    # Формируем ответ
+    text = (
+        f"📋 *Статистика обращений*\n\n"
+        f"🟢 Открытые: {len(open_tickets)}\n"
+        f"🟡 Отвеченные: {len(answered_tickets)}\n"
+        f"🔴 Закрытые: {len(closed_tickets)}\n"
+        f"📊 Всего: {len(tickets)}\n\n"
+    )
+    
+    # Показываем последние 3 открытых тикета
+    if open_tickets:
+        text += "🟢 *ПОСЛЕДНИЕ ОТКРЫТЫЕ:*\n\n"
+        
+        # Берем последние 3 открытых тикета
+        for ticket in open_tickets[-3:][::-1]:
+            # Получаем данные пользователя
+            user_data = db.get_user(ticket['user_id'])
+            user_name = user_data.get('first_name', 'Неизвестно')
+            
+            # Форматируем дату
+            date = datetime.fromisoformat(ticket['created_at']).strftime("%d.%m %H:%M")
+            
+            text += f"🔸 *Тикет #{ticket['id']}*\n"
+            text += f"👤 {user_name} (ID: {ticket['user_id']})\n"
+            text += f"📅 {date}\n"
+            text += f"💬 {ticket['message'][:50]}...\n"
+            text += f"📤 Для ответа: `/ответить {ticket['id']} ваш текст`\n\n"
+    
+    bot.send_message(message.chat.id, text)
+
+@bot.message_handler(commands=['ответить', 'answer'])
+def answer_ticket_command(message):
+    """Ответить на обращение (только админы 5 уровня)"""
+    user = message.from_user
+    
+    # Проверяем права
+    if not is_admin(user.id, 5):
+        bot.send_message(message.chat.id, "❌ Эта команда только для админов 5 уровня!")
+        return
+    
+    # Разбираем команду: /ответить 1 Привет, помогу!
+    parts = message.text.split(maxsplit=2)
+    
+    # Проверяем формат
+    if len(parts) < 3:
+        bot.send_message(message.chat.id,
+                        "❌ *Неправильный формат!*\n\n"
+                        "📝 *Правильно:*\n"
+                        "/ответить НОМЕР_ТИКЕТА ВАШ_ОТВЕТ\n\n"
+                        "📋 *Пример:*\n"
+                        "/ответить 1 Привет! Проблему уже исправляем.")
+        return
+    
+    try:
+        # Пытаемся получить номер тикета
+        ticket_id = int(parts[1])
+        # Получаем текст ответа
+        reply_text = parts[2]
+    except:
+        bot.send_message(message.chat.id, "❌ Ошибка! Номер тикета должен быть числом.")
+        return
+    
+    # Ищем тикет в базе данных
+    ticket_found = False
+    
+    for ticket in db.support_tickets:
+        if ticket['id'] == ticket_id:
+            ticket_found = True
+            
+            # Отвечаем на тикет
+            success = db.answer_ticket(ticket_id, user.id, reply_text)
+            
+            if success:
+                # Получаем данные пользователя для ответа
+                user_data = db.get_user(ticket['user_id'])
+                user_name = user_data.get('first_name', 'Игрок')
+                
+                # Отправляем ответ пользователю
+                try:
+                    bot.send_message(
+                        int(ticket['user_id']),  # ID пользователя
+                        f"💬 *Ответ от администратора*\n\n"
+                        f"🆔 Номер обращения: #{ticket_id}\n"
+                        f"👮 Администратор: {user.first_name}\n\n"
+                        f"📤*Ответ:*\n{reply_text}\n\n"
+                        f"Если вопрос решен, можете не отвечать."
+                    )
+                except Exception as e:
+                    print(f"Не удалось отправить ответ пользователю: {e}")
+                
+                # Отправляем подтверждение админу
+                bot.send_message(
+                    message.chat.id,
+                    f"✅ *Ответ отправлен!*\n\n"
+                    f"🆔 Тикет: #{ticket_id}\n"
+                    f"👤 Пользователь: {user_name}\n"
+                    f"📤 Ответ: {reply_text[:100]}..."
+                )
+                
+                # Логируем действие
+                db.log_admin_action(user.id, "answer_ticket", ticket['user_id'], f"Тикет #{ticket_id}")
+            else:
+                bot.send_message(message.chat.id, f"❌ Ошибка при ответе на тикет #{ticket_id}")
+            
+            break  # Выходим из цикла
+    
+    if not ticket_found:
+        bot.send_message(message.chat.id, f"❌ Тикет #{ticket_id} не найден.")
+
+@bot.message_handler(commands=['закрыть', 'close'])
+def close_ticket_command(message):
+    """Закрыть обращение (только админы 5 уровня)"""
+    user = message.from_user
+    
+    if not is_admin(user.id, 5):
+        bot.send_message(message.chat.id, "❌ Эта команда только для админов 5 уровня!")
+        return
+    
+    parts = message.text.split()
+    
+    if len(parts) < 2:
+        bot.send_message(message.chat.id,
+                        "❌ *Неправильный формат!*\n\n"
+                        "📝 *Правильно:*\n"
+                        "/закрыть НОМЕР_ТИКЕТА\n\n"
+                        "📋 *Пример:*\n"
+                        "/закрыть 1")
+        return
+    
+    try:
+        ticket_id = int(parts[1])
+    except:
+        bot.send_message(message.chat.id, "❌ Ошибка! Номер тикета должен быть числом.")
+        return
+    
+    # Закрываем тикет
+    if db.close_ticket(ticket_id):
+        bot.send_message(message.chat.id, f"✅ Тикет #{ticket_id} закрыт.")
+        
+        # Логируем
+        db.log_admin_action(user.id, "close_ticket", details=f"Тикет #{ticket_id}")
+    else:
+        bot.send_message(message.chat.id, f"❌ Тикет #{ticket_id} не найден.")
+
+@bot.message_handler(commands=['тикет', 'ticket'])
+def show_ticket_command(message):
+    """Посмотреть конкретное обращение (только админы 5 уровня)"""
+    user = message.from_user
+    
+    if not is_admin(user.id, 5):
+        bot.send_message(message.chat.id, "❌ Эта команда только для админов 5 уровня!")
+        return
+    
+    parts = message.text.split()
+    
+    if len(parts) < 2:
+        bot.send_message(message.chat.id,
+                        "❌ *Неправильный формат!*\n\n"
+                        "📝 *Правильно:*\n"
+                        "/тикет НОМЕР_ТИКЕТА\n\n"
+                        "📋 *Пример:*\n"
+                        "/тикет 1")
+        return
+    
+    try:
+        ticket_id = int(parts[1])
+    except:
+        bot.send_message(message.chat.id, "❌ Ошибка! Номер тикета должен быть числом.")
+        return
+    
+    # Ищем тикет
+    for ticket in db.support_tickets:
+        if ticket['id'] == ticket_id:
+            # Получаем данные пользователя
+            user_data = db.get_user(ticket['user_id'])
+            user_name = user_data.get('first_name', 'Неизвестно')
+            username = f"@{user_data.get('username')}" if user_data.get('username') else "Нет username"
+            
+            # Форматируем даты
+            created = datetime.fromisoformat(ticket['created_at']).strftime("%d.%m.%Y %H:%M")
+            status_ru = "Открыто" if ticket['status'] == 'open' else "Отвечено" if ticket['status'] == 'answered' else "Закрыто"
+            status_emoji = "🟢" if ticket['status'] == 'open' else "🟡" if ticket['status'] == 'answered' else "🔴"
+            
+            # Формируем текст
+            text = (
+                f"{status_emoji} *Тикет #{ticket['id']}*\n\n"
+                f"👤 *Пользователь:* {user_name}\n"
+                f"📱 *Username:* {username}\n"f"🆔 *ID:* {ticket['user_id']}\n"
+                f"📊 *Статус:* {status_ru}\n"
+                f"📅 *Создано:* {created}\n\n"
+                f"💬 *Сообщение:*\n{ticket['message']}\n\n"
+            )
+            
+            if ticket['reply']:
+                # Получаем данные админа
+                admin_data = db.get_user(ticket['admin_id'])
+                admin_name = admin_data.get('first_name', 'Администратор') if admin_data else 'Администратор'
+                
+                text += f"📤 *Ответ ({admin_name}):*\n{ticket['reply']}\n\n"
+            
+            text += f"📝 *Команды:*\n"
+            text += f"• `/ответить {ticket['id']} текст` - Ответить\n"
+            text += f"• `/закрыть {ticket['id']}` - Закрыть\n"
+            
+            bot.send_message(message.chat.id, text)
+            return
+    
+    bot.send_message(message.chat.id, f"❌ Тикет #{ticket_id} не найден.")
+
 # ========== ОБРАБОТЧИКИ КНОПОК ==========
 @bot.message_handler(func=lambda msg: msg.text == '🎣 Начать рыбалку')
 def fishing_button_handler(message):
@@ -3095,7 +3429,7 @@ def top_button_handler(message):
 
 @bot.message_handler(func=lambda msg: msg.text == '📰 Новости')
 def news_button_handler(message):
-    news_command(message)
+    public_news_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '💰 Донат')
 def donate_button_handler(message):
@@ -3662,24 +3996,31 @@ def callback_handler(call):
     
     elif call.data.startswith('buy_upgrade_'):
         upgrade_effect = call.data[11:]
-        upgrade = next((u for u in ROD_UPGRADES if u['effect'] == upgrade_effect), None)
-        
+        print(f"DEBUG: Ищем улучшение с эффектом '{upgrade_effect}'")  # для отладки
+    
+        upgrade = None
+        for u in ROD_UPGRADES:
+            if u['effect'] == upgrade_effect:
+                upgrade = u
+                break
+    
         if not upgrade:
+            print(f"DEBUG: Улучшение не найдено. Доступные: {[u['effect'] for u in ROD_UPGRADES]}")
             bot.answer_callback_query(call.id, "❌ Улучшение не найдено!")
             return
-        
+    
         user_data = db.get_user(user.id)
         current_rod = user_data['current_rod']
         rod_data = db.get_user_rod(user.id, current_rod)
-        
+    
         if not rod_data:
             bot.answer_callback_query(call.id, "❌ Удочка не найдена!")
             return
-        
+    
         if user_data['coins'] < upgrade['price']:
             bot.answer_callback_query(call.id, f"❌ Недостаточно {COINS_NAME}! Нужно {upgrade['price']}, у вас {user_data['coins']}")
             return
-        
+    
         success, new_balance = db.remove_coins(user.id, upgrade['price'])
         if success:
             if upgrade_effect == 'repair_50':
@@ -3714,13 +4055,15 @@ def callback_handler(call):
                 db.upgrade_rod(user.id, current_rod, "unbreakable")
                 db.log_action(user.id, "upgrade_unbreakable", current_rod)
                 result_text = f"🛡️ Удочка теперь нерушима!"
-            
+            else:
+                result_text = "✅ Улучшение применено"
+        
             # Обновляем сообщение
             markup = types.InlineKeyboardMarkup()
             btn_back = types.InlineKeyboardButton('🛒 Продолжить покупки', callback_data='shop_upgrades')
             btn_menu = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
             markup.add(btn_back, btn_menu)
-            
+        
             text = f"✅ *Улучшение применено!*\n\n{upgrade['emoji']} {upgrade['name']}\n{result_text}\n\n💰 Потрачено: {upgrade['price']} {COINS_NAME}\n💳 Осталось: {new_balance} {COINS_NAME}"
             bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
         else:
@@ -4155,6 +4498,217 @@ def callback_handler(call):
     # Если callback не обработан
     else:
         bot.answer_callback_query(call.id, "⚠️ Неизвестная команда")
+
+# ========== ТЕХПОДДЕРЖКА ==========
+
+# Когда пользователь нажимает "Техподдержка"
+@bot.callback_query_handler(func=lambda call: call.data == 'support_new')
+def support_new_handler(call):
+    user = call.from_user
+    
+    # Просим написать сообщение
+    bot.send_message(call.message.chat.id,
+                    "✍️ *Напишите ваше обращение:*\n\n"
+                    "Пример:\n"
+                    "• 'Не могу купить удочку'\n"
+                    "• 'Рыбалка не работает'\n"
+                    "• 'Проблема с донатом'\n\n"
+                    "Опишите подробно что случилось.")
+    
+    # Ждем ответ
+    bot.register_next_step_handler(call.message, process_support_step1, user.id)
+    
+    bot.answer_callback_query(call.id)
+
+def process_support_step1(message, user_id):
+    """Шаг 1: Получили сообщение"""
+    user = message.from_user
+    
+    if not message.text:
+        bot.send_message(message.chat.id, "❌ Нужен текст!")
+        return
+    
+    # Сохраняем
+    user_data = db.get_user(user.id)
+    user_data['support_msg'] = message.text
+    db.save_data()
+    
+    # Подтверждение
+    markup = types.InlineKeyboardMarkup()
+    btn_yes = types.InlineKeyboardButton('✅ Отправить', callback_data='support_yes')
+    btn_no = types.InlineKeyboardButton('❌ Отменить', callback_data='support_no')
+    markup.add(btn_yes, btn_no)
+    
+    bot.send_message(message.chat.id,
+                    f"📝 *Подтвердите:*\n\n"
+                    f"Сообщение:\n'{message.text}'\n\n"
+                    f"Отправить в техподдержку?",
+                    reply_markup=markup)
+
+# Подтверждение отправки
+@bot.callback_query_handler(func=lambda call: call.data in ['support_yes', 'support_no'])
+def support_confirm_handler(call):
+    user = call.from_user
+    user_data = db.get_user(user.id)
+    
+    if call.data == 'support_no':
+        # Отмена
+        if 'support_msg' in user_data:
+            del user_data['support_msg']
+            db.save_data()
+        bot.send_message(call.message.chat.id, "❌ Отменено.")
+        bot.answer_callback_query(call.id)
+        return
+    
+    # Отправка
+    if 'support_msg' not in user_data:
+        bot.send_message(call.message.chat.id, "❌ Ошибка.")
+        bot.answer_callback_query(call.id)
+        return
+    
+    msg_text = user_data['support_msg']
+    
+    # Создаем тикет
+    ticket = db.create_ticket(user.id, msg_text)
+    
+    # Уведомляем пользователя
+    bot.send_message(call.message.chat.id,
+                    f"✅ *Отправлено!*\n\n"
+                    f"🆔 Номер: #{ticket['id']}\n"
+                    f"📅 Дата: {datetime.now().strftime('%d.%m %H:%M')}\n\n"
+                    f"Админ ответит скоро.",
+                    reply_markup=create_main_keyboard(user.id))
+    
+    # Уведомляем админов
+    for admin_id, level in ADMINS.items():
+        if level >= 5:
+            try:
+                bot.send_message(
+                    admin_id,
+                    f"🆘 *НОВОЕ ОБРАЩЕНИЕ*\n\n"
+                    f"🆔 Тикет: #{ticket['id']}\n"
+                    f"👤 Игрок: {user.first_name}\n"
+                    f"🆔 ID: {user.id}\n\n"
+                    f"💬 *Сообщение:*\n{msg_text}\n\n"
+                    f"📤 Ответить: /answer {ticket['id']} текст"
+                )
+            except:
+                pass
+    
+    # Очищаем
+    del user_data['support_msg']
+    db.save_data()
+    bot.answer_callback_query(call.id)
+
+# Показать мои обращения
+@bot.callback_query_handler(func=lambda call: call.data == 'support_list')
+def support_list_handler(call):
+    user = call.from_user
+    tickets = db.get_user_tickets(user.id)
+    
+    if not tickets:
+        bot.send_message(call.message.chat.id, "📋 Обращений нет.")
+        bot.answer_callback_query(call.id)
+        return
+    
+    text = "📋 *Мои обращения:*\n\n"
+    
+    for ticket in tickets:
+        status = "🟢 Открыто" if ticket['status'] == 'open' else "🟡 Отвечено" if ticket['status'] == 'answered' else "🔴 Закрыто"
+        date = datetime.fromisoformat(ticket['created_at']).strftime("%d.%m %H:%M")
+        
+        text += f"🆔 #{ticket['id']} - {status}\n"
+        text += f"📅 {date}\n"
+        text += f"💬 {ticket['message'][:60]}...\n"
+        
+        if ticket['reply']:
+            text += f"📤 Ответ: {ticket['reply'][:80]}...\n"
+        
+        text += "─\n"
+    
+    bot.send_message(call.message.chat.id, text)
+    bot.answer_callback_query(call.id)
+
+# ========== АДМИНСКИЕ КОМАНДЫ ДЛЯ ТЕХПОДДЕРЖКИ ==========
+
+@bot.message_handler(commands=['tickets'])
+def show_tickets_command(message):
+    """Показать все открытые обращения (админы 5 уровня)"""
+    user = message.from_user
+    if not is_admin(user.id, 5):
+        bot.send_message(message.chat.id, "❌ Недостаточно прав!")
+        return
+    
+    tickets = db.get_open_tickets()
+    
+    if not tickets:
+        bot.send_message(message.chat.id, "✅ Нет открытых обращений")
+        return
+    
+    text = f"🆘 *Открытые обращения: {len(tickets)}*\n\n"
+    
+    for ticket in tickets:
+        user_data = db.get_user(ticket['user_id'])
+        user_name = user_data.get('first_name', 'Неизвестно')
+        date = datetime.fromisoformat(ticket['created_at']).strftime("%d.%m %H:%M")
+        
+        text += f"🆔 *#{ticket['id']}*\n"
+        text += f"👤 {user_name} ({ticket['user_id']})\n"
+        text += f"📅 {date}\n"
+        text += f"💬 {ticket['message'][:100]}...\n"
+        text += f"📤 /answer_{ticket['id']} текст_ответа\n\n"
+    
+    bot.send_message(message.chat.id, text)
+
+@bot.message_handler(commands=['answer'])
+def answer_ticket_command(message):
+    """Ответить на тикет (админы 5 уровня)"""
+    user = message.from_user
+    if not is_admin(user.id, 5):
+        bot.send_message(message.chat.id, "❌ Недостаточно прав!")
+        return
+    
+    parts = message.text.split(maxsplit=2)
+    if len(parts) < 3:
+        bot.send_message(message.chat.id, 
+                        "❌ Формат: /answer номер_тикета ваш_ответ\n"
+                        "Пример: /answer 1 Привет, помогу!")
+        return
+    
+    try:
+        ticket_id = int(parts[1])
+        reply_text = parts[2]
+    except:
+        bot.send_message(message.chat.id, "❌ Ошибка в данных")
+        return
+    
+    # Ищем тикет
+    ticket_found = False
+    for ticket in db.support_tickets:
+        if ticket['id'] == ticket_id:
+            ticket_found = True
+            
+            # Отвечаем
+            db.answer_ticket(ticket_id, user.id, reply_text)
+            
+            # Отправляем ответ пользователю
+            try:
+                user_id = int(ticket['user_id'])
+                bot.send_message(
+                    user_id,
+                    f"💬 *Ответ от администратора*\n\n"
+                    f"🆔 Тикет: #{ticket_id}\n"
+                    f"👮 Админ: {user.first_name}\n\n"
+                    f"📤 *Ответ:*\n{reply_text}"
+                )
+            except:
+                pass
+            
+            bot.send_message(message.chat.id, f"✅ Ответ отправлен на тикет #{ticket_id}")
+            break
+    
+    if not ticket_found:
+        bot.send_message(message.chat.id, f"❌ Тикет #{ticket_id} не найден")
 
 # ========== ОБРАБОТКА ВСЕХ СООБЩЕНИЙ ==========
 @bot.message_handler(func=lambda message: True, content_types=['text'])
