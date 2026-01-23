@@ -4422,7 +4422,7 @@ def status():
         return json.dumps({"error": str(e)}), 500
 
 # ========== ЗАПУСК ==========
-if __name__ == '__main__':
+def run():
     print("=" * 50)
     print("🎣 Fishing Bot Webhook Edition")
     print("=" * 50)
@@ -4442,8 +4442,12 @@ if __name__ == '__main__':
     else:
         print("⚠️ RENDER_EXTERNAL_URL не настроен, бот будет работать без webhook")
     
-    print("🔄 Запуск Flask сервера...")
+    print("🔄 Запуск сервера...")
+
+    port = int(os.environ.get('PORT',10000))
     
-    # Получаем порт из переменных окружения Render
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    from waitress import serve
+    serve(app, host='0.0.0.0', port=port)
+
+if __name__ == '__main__':
+    run()
