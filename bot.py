@@ -436,7 +436,7 @@ URL_PATTERN = re.compile(
 )
 USERNAME_PATTERN = re.compile(r'@[a-zA-Z0-9_]{5,32}')
 
-# ========== USER DATABASE (РАСШИРЕННАЯ) ==========
+# ========== USER DATABASE ==========
 class UserDatabase:
     def __init__(self):
         self.users = {}
@@ -457,6 +457,77 @@ class UserDatabase:
     
         print(f"💾 Система сохранения: ВКЛЮЧЕНА")
         print(f"📁 Папка пользователей: users_data/")
+    
+    def load_logs(self):
+        """Загружаем логи с обработкой ошибок"""
+        # Админ логи
+        try:
+            if os.path.exists(ADMIN_LOG_FILE) and os.path.getsize(ADMIN_LOG_FILE) > 0:
+                with open(ADMIN_LOG_FILE, 'r', encoding='utf-8') as f:
+                    self.admin_logs = json.load(f)
+                print(f"✅ Загружено {len(self.admin_logs)} логов админов")
+            else:
+                self.admin_logs = []
+                print(f"📁 Файл {ADMIN_LOG_FILE} не найден или пустой")
+        except json.JSONDecodeError:
+            print(f"⚠️ Ошибка JSON в {ADMIN_LOG_FILE}, создаю новый файл")
+            self.admin_logs = []
+        except Exception as e:
+            print(f"⚠️ Ошибка загрузки {ADMIN_LOG_FILE}: {e}")
+            self.admin_logs = []
+        
+        # Логи действий
+        try:
+            if os.path.exists(ACTION_LOG_FILE) and os.path.getsize(ACTION_LOG_FILE) > 0:
+                with open(ACTION_LOG_FILE, 'r', encoding='utf-8') as f:
+                    self.action_logs = json.load(f)
+                print(f"✅ Загружено {len(self.action_logs)} логов действий")
+            else:
+                self.action_logs = []
+                print(f"📁 Файл {ACTION_LOG_FILE} не найден или пустой")
+        except json.JSONDecodeError:
+            print(f"⚠️ Ошибка JSON в {ACTION_LOG_FILE}, создаю новый файл")
+            self.action_logs = []
+        except Exception as e:
+            print(f"⚠️ Ошибка загрузки {ACTION_LOG_FILE}: {e}")
+            self.action_logs = []
+    
+    def save_all_data(self):
+        """Сохранить все данные"""
+        try:
+            # Сохраняем общие данные
+            data = {
+                'users': self.users,
+                'admins': ADMINS,
+                'news': self.news,
+                'donate_transactions': self.donate_transactions,
+                'support_tickets': self.support_tickets
+            }
+            with open('users_data.json', 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            
+            # Сохраняем логи
+            self.save_logs()
+            
+            print(f"💾 Данные сохранены: {len(self.users)} пользователей")
+            return True
+        except Exception as e:
+            print(f"❌ Ошибка сохранения: {e}")
+            return False
+    
+    def save_logs(self):
+        """Сохраняем логи"""
+        try:
+            with open(ADMIN_LOG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.admin_logs, f, ensure_ascii=False, indent=2)
+            
+            with open(ACTION_LOG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.action_logs, f, ensure_ascii=False, indent=2)
+            
+            return True
+        except Exception as e:
+            print(f"❌ Ошибка сохранения логов: {e}")
+            return False
     
     def load_data(self):
         """Загружаем данные из файла (если есть)"""
@@ -1209,20 +1280,23 @@ class UserDatabase:
 
     def save_all_users_to_files(self):
         """Сохраняем всех пользователей в файлы"""
-        saved = 0
-        errors = 0
-    
-        for user_id, user_data in self.users.items():
-            if self.save_user_to_file(user_data):
-                saved += 1
-            else:
-                errors += 1
-    
-        # Также сохраняем общие данные
-        self.save_common_data()
-    
-        print(f"💾 Автосохранение: {saved} пользователей, ошибок: {errors}")
-        return saved
+        try:
+            # Сначала сохраняем в общий файл
+            self.save_all_data()
+        
+            # Затем сохраняем каждого пользователя отдельно
+            for user_id, user_data in self.users.items():
+                file_path = os.path.join("users_data", f"{user_id}.json")
+                user_data['last_saved'] = datetime.now().isoformat()
+            
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(user_data, f, ensure_ascii=False, indent=2)
+        
+            print(f"💾 Пользователи сохранены: {len(self.users)}")
+            return len(self.users)
+        except Exception as e:
+            print(f"❌ Ошибка сохранения пользователей: {e}")
+            return 0
 
     def save_common_data(self):
         """Сохраняем общие данные"""
@@ -2136,6 +2210,26 @@ def donate_command(message):
     )
     
     bot.send_message(message.chat.id, donate_text, reply_markup=markup)
+
+@bot.message_handler(commands=['save'])
+def save_command(message):
+    """Сохранить данные"""
+    user = message.from_user
+    
+    # Проверяем права (только админы или можно всем)
+    if not is_admin(user.id, 1):
+        bot.send_message(message.chat.id, "❌ Эта команда только для админов!")
+        return
+    
+    msg = bot.send_message(message.chat.id, "💾 Сохраняю данные...")
+    
+    # Сохраняем данные
+    if db.save_all_data():
+        bot.edit_message_text(f"✅ Данные сохранены!\n👥 Пользователей: {len(db.users)}\n📝 Логов админов: {len(db.admin_logs)}", 
+                            message.chat.id, msg.message_id)
+    else:
+        bot.edit_message_text("❌ Ошибка при сохранении данных!", 
+                            message.chat.id, msg.message_id)
 
 @bot.message_handler(commands=['fishing'])
 def fishing_command_handler(message):
@@ -3414,22 +3508,6 @@ def public_news_command(message):
         text += "─" * 30 + "\n\n"
     
     bot.send_message(message.chat.id, text, reply_markup=create_main_keyboard(user.id))
-
-@bot.message_handler(commands=['сохранить', 'save'])
-def save_command(message):
-    """Принудительное сохранение данных"""
-    if not is_admin(message.from_user.id, 3):
-        return
-    
-    msg = bot.send_message(message.chat.id, "💾 Сохраняю все данные...")
-    saved = db.save_all_users_to_files()
-    bot.edit_message_text(f"✅ Сохранено {saved} пользователей", message.chat.id, msg.message_id)
-
-@bot.message_hamdler(commands=['save'])
-def save_command(message):
-    """Сохранить данные"""
-    db.save_all()
-    bot.send_message(message.chat.id, "Все данные сохранены в файлы !")
 
 @bot.message_handler(commands=['бэкап', 'backup'])
 def backup_command(message):
@@ -5357,28 +5435,33 @@ import threading
 import signal
 import sys
 
-def auto_save():
-    """Автосохранение каждые 30 секунд"""
+def auto_save_loop():
+    """Цикл автосохранения каждые 5 минут"""
     while True:
-        time.sleep(30)  # Каждые 30 секунд
-        db.save_all()
+        time.sleep(300)  # 5 минут = 300 секунд
+        try:
+            print(f"💾 Автосохранение...")
+            saved = db.save_all_users_to_files()
+            db.save_logs()
+            print(f"💾 Автосохранение завершено")
+        except Exception as e:
+            print(f"❌ Ошибка автосохранения: {e}")
 
-# Запускаем автосохранение в отдельном потоке
-save_thread = threading.Thread(target=auto_save, daemon=True)
+# Запускаем автосохранение в фоне
+save_thread = threading.Thread(target=auto_save_loop, daemon=True)
 save_thread.start()
 
-# Сохраняем при завершении
-def save_on_exit(signum, frame):
-    print("\n💾 Сохраняем данные перед выходом...")
-    db.save_all()
-    print("✅ Данные сохранены. До свидания!")
+# Обработчик для корректного завершения
+def signal_handler(sig, frame):
+    print(f"\n⚠️ Получен сигнал завершения, сохраняем данные...")
+    db.save_all_data()
+    print("✅ Данные сохранены. Выход.")
     sys.exit(0)
 
-signal.signal(signal.SIGINT, save_on_exit)
-signal.signal(signal.SIGTERM, save_on_exit)
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
-print("🤖 Бот запущен! Данные сохраняются каждые 30 секунд.")
-print("💾 Файлы: users.json, admins.json, logs.json")
+print("🤖 Система автосохранения запущена (каждые 5 минут)")
 
 # ========== ОБРАБОТКА ЗАВЕРШЕНИЯ ==========
 def signal_handler(signum, frame):
