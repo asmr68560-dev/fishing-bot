@@ -10,8 +10,13 @@ import re
 import threading
 import requests
 import math
+import shutil
+import signal
+import sys
 from datetime import datetime, timedelta
 from flask import Flask, request  # <-- ДОБАВЛЕНО ДЛЯ WEBHOOK
+
+AUTO_SAVE_INTERVAL = 300
 
 # ========== CONFIGURATION ==========
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8377535372:AAGLMfn_0P_tDvpJnfv_NmW4QclM2AIojEA')
@@ -441,8 +446,17 @@ class UserDatabase:
         self.news = []
         self.donate_transactions = []
         self.support_tickets = []
-        self.load_data()
+    
+        # Создаем необходимые папки
+        os.makedirs("users_data", exist_ok=True)
+        os.makedirs("backups", exist_ok=True)
+    
+        # Загружаем данные из файлов
+        self.load_all_users_from_files()
         self.load_logs()
+    
+        print(f"💾 Система сохранения: ВКЛЮЧЕНА")
+        print(f"📁 Папка пользователей: users_data/")
     
     def load_data(self):
         """Загружаем данные из файла (если есть)"""
@@ -683,7 +697,7 @@ class UserDatabase:
         user = self.get_user(user_id)
         if user['worms'] > 0:
             user['worms'] -= 1
-            self.save_data()
+            self.save_user_to_file(user)
             return True, user['worms']
         return False, user['worms']
     
@@ -694,7 +708,7 @@ class UserDatabase:
                 bait['count'] -= 1
                 if bait['count'] == 0:
                     user['inventory']['baits'] = [b for b in user['inventory']['baits'] if b['name'] != bait_name]
-                self.save_data()
+                self.save_user_to_file(user)
                 return True
         return False
     
@@ -797,7 +811,7 @@ class UserDatabase:
             user['experience'] -= user['fishing_level'] * 100
             user['fishing_level'] += 1
         
-        self.save_data()
+        self.save_user_to_file(user)
         return catch
     
     def add_warning(self, user_id, chat_id=None):
@@ -813,7 +827,7 @@ class UserDatabase:
             self.save_data()
             return True, len(active_warnings), True
         
-        self.save_data()
+        self.save_user_to_file(user)
         return False, len(active_warnings), False
     
     def is_banned(self, user_id):
@@ -866,7 +880,7 @@ class UserDatabase:
         user = self.get_user(user_id)
         user['coins'] = max(0, user['coins'] + amount)
         user['total_coins_earned'] = user.get('total_coins_earned', 0) + amount
-        self.save_data()
+        self.save_user_to_file(user)
         return user['coins']
     
     def remove_coins(self, user_id, amount):
@@ -875,6 +889,7 @@ class UserDatabase:
             user['coins'] -= amount
             self.save_data()
             return True, user['coins']
+        self.save_user_to_file(user)
         return False, user['coins']
     
     def add_bait(self, user_id, bait_name, count=1):
@@ -882,7 +897,7 @@ class UserDatabase:
         for bait in user['inventory']['baits']:
             if bait['name'] == bait_name:
                 bait['count'] += count
-                self.save_data()
+                self.save_user_to_file(user)
                 return True
         
         user['inventory']['baits'].append({"name": bait_name, "count": count})
@@ -901,7 +916,7 @@ class UserDatabase:
             if rod['name'] == rod_name:
                 # Если удочка уже есть, увеличиваем счетчик
                 rod['count'] = rod.get('count', 1) + 1
-                self.save_data()
+                self.save_user_to_file(user)
                 return True
         
         # Добавляем новую удочку
@@ -923,19 +938,19 @@ class UserDatabase:
         user['current_rod'] = rod_name
         for rod in user['inventory']['rods']:
             rod['equipped'] = (rod['name'] == rod_name)
-        self.save_data()
+        self.save_user_to_file(user)
         return True
     
     def set_current_bait(self, user_id, bait_name):
         user = self.get_user(user_id)
         user['current_bait'] = bait_name
-        self.save_data()
+        self.save_user_to_file(user)
         return True
     
     def set_current_location(self, user_id, location_name):
         user = self.get_user(user_id)
         user['current_location'] = location_name
-        self.save_data()
+        self.save_user_to_file(user)
         return True
     
     def sell_fish(self, user_id, fish_name, count=1, npc_index=0):
@@ -971,7 +986,7 @@ class UserDatabase:
         
         user['coins'] += total_price
         user['total_coins_earned'] = user.get('total_coins_earned', 0) + total_price
-        self.save_data()
+        self.save_user_to_file(user)
         return True, total_price
     
     def get_daily_quests(self, user_id):
@@ -1002,7 +1017,7 @@ class UserDatabase:
                     self.log_action(user_id, "quest_complete", f"Задание {quest['name']}, награда {quest['reward']}")
         
         if updated:
-            self.save_data()
+            self.save_user_to_file(user)
         return updated
     
     def get_user_rod(self, user_id, rod_name):
@@ -1037,7 +1052,7 @@ class UserDatabase:
                         self.save_data()
                         return "broken"
                     
-                    self.save_data()
+                    self.save_user_to_file(user)
                     
                     # Проверяем, нужно ли предупредить о низкой прочности
                     if rod['durability'] <= rod['max_durability'] * 0.2:
@@ -1053,7 +1068,7 @@ class UserDatabase:
         for rod in user['inventory']['rods']:
             if rod['name'] == rod_name:
                 rod['durability'] = min(rod['max_durability'], rod['durability'] + amount)
-                self.save_data()
+                self.save_user_to_file(user)
                 return rod['durability']
         return 0
     
@@ -1078,7 +1093,7 @@ class UserDatabase:
             rod['upgrades'] = []
         rod['upgrades'].append(upgrade_type)
         
-        self.save_data()
+        self.save_user_to_file(user)
         return True
     
     def get_top_players(self, category="coins", limit=10):
@@ -1135,6 +1150,130 @@ class UserDatabase:
                     self.save_data()
                     return transaction
         return None
+
+        # В класс UserDatabase добавь:
+
+    def get_user_file_path(self, user_id):
+        """Получаем путь к файлу пользователя"""
+        user_id = str(user_id)
+        return os.path.join("users_data", f"{user_id}.json")
+
+    def save_user_to_file(self, user):
+        """Сохраняем пользователя в файл"""
+        try:
+           user_id = str(user['id']) if 'id' in user else str(user.get('user_id', 'unknown'))
+           file_path = self.get_user_file_path(user_id)
+        
+           # Создаем папку если ее нет
+           os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+           # Добавляем метку времени
+           user['last_saved'] = datetime.now().isoformat()
+        
+           with open(file_path, 'w', encoding='utf-8') as f:
+               json.dump(user, f, ensure_ascii=False, indent=2)
+        
+           return True
+        except Exception as e:
+            print(f"❌ Ошибка сохранения пользователя {user_id}: {e}")
+            return False
+
+    def load_user_from_file(self, user_id):
+        """Загружаем пользователя из файла"""
+        try:
+            file_path = self.get_user_file_path(user_id)
+            if os.path.exists(file_path):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+        except Exception as e:
+            print(f"❌ Ошибка загрузки пользователя {user_id}: {e}")
+        return None
+
+    def save_all_users_to_files(self):
+        """Сохраняем всех пользователей в файлы"""
+        saved = 0
+        errors = 0
+    
+        for user_id, user_data in self.users.items():
+            if self.save_user_to_file(user_data):
+                saved += 1
+            else:
+                errors += 1
+    
+        # Также сохраняем общие данные
+        self.save_common_data()
+    
+        print(f"💾 Автосохранение: {saved} пользователей, ошибок: {errors}")
+        return saved
+
+    def save_common_data(self):
+        """Сохраняем общие данные"""
+        try:
+            common_data = {
+                'admins': ADMINS,
+                'news': self.news,
+                'donate_transactions': self.donate_transactions,
+                'support_tickets': self.support_tickets,
+                'last_save': datetime.now().isoformat()
+            }
+        
+            with open('common_data.json', 'w', encoding='utf-8') as f:
+                json.dump(common_data, f, ensure_ascii=False, indent=2)
+        
+            # Сохраняем логи
+            self.save_logs()
+        
+            return True
+        except Exception as e:
+            print(f"❌ Ошибка сохранения общих данных: {e}")
+            return False
+
+    def load_all_users_from_files(self):
+        """Загружаем всех пользователей из файлов"""
+        try:
+            if not os.path.exists("users_data"):
+                print("📁 Папка users_data не найдена, создаем новую")
+                os.makedirs("users_data", exist_ok=True)
+                return
+        
+            for filename in os.listdir("users_data"):
+                if filename.endswith('.json'):
+                    user_id = filename.replace('.json', '')
+                    try:
+                       with open(os.path.join("users_data", filename), 'r', encoding='utf-8') as f:
+                           user_data = json.load(f)
+                       self.users[user_id] = user_data
+                    except Exception as e:
+                        print(f"❌ Ошибка загрузки пользователя {user_id}: {e}")
+        
+            print(f"✅ Загружено {len(self.users)} пользователей из файлов")
+        except Exception as e:
+            print(f"❌ Ошибка загрузки пользователей: {e}")
+
+    def create_backup(self):
+        """Создаем бэкап"""
+        try:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_dir = "backups"
+            os.makedirs(backup_dir, exist_ok=True)
+        
+            backup_path = os.path.join(backup_dir, f"backup_{timestamp}")
+            os.makedirs(backup_path, exist_ok=True)
+        
+            # Копируем папку users_data
+            if os.path.exists("users_data"):
+                 shutil.copytree("users_data", os.path.join(backup_path, "users_data"))
+        
+            # Копируем общие файлы
+            for file in ['common_data.json', 'admin_logs.json', 'action_logs.json']:
+                if os.path.exists(file):
+                    shutil.copy2(file, backup_path)
+                   
+            print(f"📦 Создан бэкап: {backup_path}")
+            return backup_path
+        except Exception as e:
+            print(f"❌ Ошибка создания бэкапа: {e}")
+            return None
 
 db = UserDatabase()
 
@@ -3258,6 +3397,30 @@ def public_news_command(message):
     
     bot.send_message(message.chat.id, text, reply_markup=create_main_keyboard(user.id))
 
+@bot.message_handler(commands=['сохранить', 'save'])
+def save_command(message):
+    """Принудительное сохранение данных"""
+    if not is_admin(message.from_user.id, 3):
+        return
+    
+    msg = bot.send_message(message.chat.id, "💾 Сохраняю все данные...")
+    saved = db.save_all_users_to_files()
+    bot.edit_message_text(f"✅ Сохранено {saved} пользователей", message.chat.id, msg.message_id)
+
+@bot.message_handler(commands=['бэкап', 'backup'])
+def backup_command(message):
+    """Создание бэкапа"""
+    if not is_admin(message.from_user.id, 5):
+        return
+    
+    msg = bot.send_message(message.chat.id, "📦 Создаю бэкап...")
+    backup_path = db.create_backup()
+    
+    if backup_path:
+        bot.edit_message_text(f"✅ Бэкап создан: `{backup_path}`", message.chat.id, msg.message_id)
+    else:
+        bot.edit_message_text("❌ Ошибка создания бэкапа", message.chat.id, msg.message_id)
+
 # ========== АДМИНСКИЕ КОМАНДЫ ДЛЯ ТЕХПОДДЕРЖКИ ==========
 
 @bot.message_handler(commands=['тикеты', 'tickets'])
@@ -5164,6 +5327,33 @@ def status():
         }, ensure_ascii=False, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)}), 500
+
+# ========== АВТОСОХРАНЕНИЕ ==========
+def auto_save():
+    """Автоматическое сохранение каждые 5 минут"""
+    while True:
+        time.sleep(AUTO_SAVE_INTERVAL)
+        try:
+            db.save_all_users_to_files()
+            print(f"💾 Автосохранение выполнено: {datetime.now().strftime('%H:%M:%S')}")
+        except Exception as e:
+            print(f"❌ Ошибка автосохранения: {e}")
+
+# Запускаем автосохранение в отдельном потоке
+save_thread = threading.Thread(target=auto_save, daemon=True)
+save_thread.start()
+
+# ========== ОБРАБОТКА ЗАВЕРШЕНИЯ ==========
+def signal_handler(signum, frame):
+    """Сохраняем данные при завершении"""
+    print(f"\n⚠️ Получен сигнал завершения...")
+    print("💾 Сохраняю все данные...")
+    db.save_all_users_to_files()
+    print("✅ Все данные сохранены!")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 # ========== ЗАПУСК СЕРВЕРА ==========
 def run():
