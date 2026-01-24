@@ -3407,6 +3407,12 @@ def save_command(message):
     saved = db.save_all_users_to_files()
     bot.edit_message_text(f"✅ Сохранено {saved} пользователей", message.chat.id, msg.message_id)
 
+@bot.message_hamdler(commands=['save'])
+def save_command(message):
+    """Сохранить данные"""
+    db.save_all()
+    bot.send_message(message.chat.id, "Все данные сохранены в файлы !")
+
 @bot.message_handler(commands=['бэкап', 'backup'])
 def backup_command(message):
     """Создание бэкапа"""
@@ -5329,19 +5335,32 @@ def status():
         return json.dumps({"error": str(e)}), 500
 
 # ========== АВТОСОХРАНЕНИЕ ==========
+import threading
+import signal
+import sys
+
 def auto_save():
-    """Автоматическое сохранение каждые 5 минут"""
+    """Автосохранение каждые 30 секунд"""
     while True:
-        time.sleep(AUTO_SAVE_INTERVAL)
-        try:
-            db.save_all_users_to_files()
-            print(f"💾 Автосохранение выполнено: {datetime.now().strftime('%H:%M:%S')}")
-        except Exception as e:
-            print(f"❌ Ошибка автосохранения: {e}")
+        time.sleep(30)  # Каждые 30 секунд
+        db.save_all()
 
 # Запускаем автосохранение в отдельном потоке
 save_thread = threading.Thread(target=auto_save, daemon=True)
 save_thread.start()
+
+# Сохраняем при завершении
+def save_on_exit(signum, frame):
+    print("\n💾 Сохраняем данные перед выходом...")
+    db.save_all()
+    print("✅ Данные сохранены. До свидания!")
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, save_on_exit)
+signal.signal(signal.SIGTERM, save_on_exit)
+
+print("🤖 Бот запущен! Данные сохраняются каждые 30 секунд.")
+print("💾 Файлы: users.json, admins.json, logs.json")
 
 # ========== ОБРАБОТКА ЗАВЕРШЕНИЯ ==========
 def signal_handler(signum, frame):
