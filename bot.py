@@ -482,19 +482,37 @@ class UserDatabase:
             self.donate_transactions = []
     
     def load_logs(self):
-        """Загружаем логи"""
+        """Загружаем логи с обработкой ошибок"""
+        # Админ логи
         try:
-            with open(ADMIN_LOG_FILE, 'r', encoding='utf-8') as f:
-                self.admin_logs = json.load(f)
-            print(f"✅ Загружено {len(self.admin_logs)} логов админов")
-        except FileNotFoundError:
+            if os.path.exists(ADMIN_LOG_FILE) and os.path.getsize(ADMIN_LOG_FILE) > 0:
+                with open(ADMIN_LOG_FILE, 'r', encoding='utf-8') as f:
+                    self.admin_logs = json.load(f)
+                print(f"✅ Загружено {len(self.admin_logs)} логов админов")
+            else:
+                self.admin_logs = []
+                print(f"📁 Файл {ADMIN_LOG_FILE} не найден или пустой, создаю новый")
+        except json.JSONDecodeError:
+            print(f"⚠️ Ошибка JSON в {ADMIN_LOG_FILE}, создаю новый файл")
             self.admin_logs = []
-        
+        except Exception as e:
+            print(f"⚠️ Ошибка загрузки {ADMIN_LOG_FILE}: {e}")
+            self.admin_logs = []
+    
+        # Логи действий
         try:
-            with open(ACTION_LOG_FILE, 'r', encoding='utf-8') as f:
-                self.action_logs = json.load(f)
-            print(f"✅ Загружено {len(self.action_logs)} логов действий")
-        except FileNotFoundError:
+            if os.path.exists(ACTION_LOG_FILE) and os.path.getsize(ACTION_LOG_FILE) > 0:
+                with open(ACTION_LOG_FILE, 'r', encoding='utf-8') as f:
+                    self.action_logs = json.load(f)
+                print(f"✅ Загружено {len(self.action_logs)} логов действий")
+            else:
+                self.action_logs = []
+                print(f"📁 Файл {ACTION_LOG_FILE} не найден или пустой, создаю новый")
+        except json.JSONDecodeError:
+            print(f"⚠️ Ошибка JSON в {ACTION_LOG_FILE}, создаю новый файл")
+            self.action_logs = []
+        except Exception as e:
+            print(f"⚠️ Ошибка загрузки {ACTION_LOG_FILE}: {e}")
             self.action_logs = []
     
     def save_data(self):
