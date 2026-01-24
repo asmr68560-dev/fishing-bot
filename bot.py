@@ -17,6 +17,8 @@ from datetime import datetime, timedelta
 from flask import Flask, request  # <-- ДОБАВЛЕНО ДЛЯ WEBHOOK
 
 AUTO_SAVE_INTERVAL = 300
+FIRST_TIME_USERS =set()
+NEW_USERS = {}
 
 # ========== CONFIGURATION ==========
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8377535372:AAGLMfn_0P_tDvpJnfv_NmW4QclM2AIojEA')
@@ -1369,6 +1371,108 @@ class UserDatabase:
 
 db = UserDatabase()
 
+# ========== ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ДЛЯ ПРОВЕРКИ ПЕРВОГО ВХОДА ==========
+@bot.message_handler(func=lambda message: True, content_types=['text'])
+def global_message_handler(message):
+    """Проверяем все сообщения на первый вход"""
+    user = message.from_user
+    user_id = str(user.id)
+    
+    # ИГНОРИРУЕМ команды (их обработают другие хендлеры)
+    if message.text and message.text.startswith('/'):
+        # Если это команда /start, просто пропускаем
+        if message.text.startswith('/start'):
+            return
+        # Для других команд проверяем, есть ли пользователь в базе
+        else:
+            # Проверяем, существует ли пользователь в базе
+            user_in_db = user_id in db.users
+            
+            if not user_in_db:
+                # Пользователь пытается использовать команду без регистрации
+                show_start_required_message(message)
+                return
+    
+    # Проверяем, есть ли пользователь в базе данных
+    user_in_db = user_id in db.users
+    
+    # Если пользователя НЕТ в базе
+    if not user_in_db:
+        # Проверяем, не показывали ли мы уже сообщение этому пользователю
+        # (чтобы не спамить сообщением на каждое его сообщение)
+        if user_id not in NEW_USERS or (time.time() - NEW_USERS[user_id]) > 60:
+            # Запоминаем когда показывали сообщение
+            NEW_USERS[user_id] = time.time()
+            
+            # Показываем сообщение о необходимости /start
+            show_start_required_message(message)
+        return
+    
+    # Если пользователь ЕСТЬ в базе, но забанен
+    if db.is_banned(user_id):
+        return
+    
+    # Проверяем ссылки в группах (если сообщение в группе)
+    if message.chat.type in ['group', 'supergroup']:
+        delete_links_in_group(message)
+
+def show_start_required_message(message):
+    """Показать сообщение о необходимости начать игру"""
+    user = message.from_user
+    
+    # Создаем инлайн-клавиатуру с кнопкой
+    markup = types.InlineKeyboardMarkup()
+    
+    # Кнопка 1: Начать игру (отправляет /start)
+    btn_start = types.InlineKeyboardButton(
+        '🎣 НАЧАТЬ ИГРУ', 
+        callback_data='first_time_start_command'
+    )
+    
+    # Кнопка 2: Помощь
+    btn_help = types.InlineKeyboardButton(
+        '❓ ЧТО ЭТО ЗА ИГРА?', 
+        callback_data='first_time_help'
+    )
+    
+    markup.add(btn_start)
+    markup.add(btn_help)
+    
+    # Текст сообщения
+    welcome_msg = (
+        f"👋 *Привет, {user.first_name}!*\n\n"
+        
+        f"🎣 *Добро пожаловать в игру \"РЫБАЛКА\"!*\n"
+        f"📍 *Рыбалка по-русски* - увлекательная игра про рыбалку в реальных водоемах России!\n\n"
+        
+        f"📝 *Перед началом игры нужно:*\n"
+        f"1. **Зарегистрироваться** - нажать кнопку ниже\n"
+        f"2. **Создать профиль** - система сохранит ваш прогресс\n"
+        f"3. **Настроить ник** - как вас будут видеть в рейтингах\n\n"
+        
+        f"⚙️ *Почему это важно:*\n"
+        f"• Без регистрации ваш прогресс не сохранится\n"
+        f"• Вы не сможете участвовать в рейтингах\n"
+        f"• Вы не сможете покупать снасти и улучшения\n\n"
+        
+        f"🎮 *После регистрации вы сможете:*\n"
+        f"• 🎣 Ловить 100+ видов рыбы\n"
+        f"• 🌊 Рыбачить на 10 реальных водоемах России\n"
+        f"• 🏆 Участвовать в рейтингах и топах\n"
+        f"• ⚙️ Настроить уникальный ник\n"
+        f"• 💰 Покупать снасти и улучшения\n\n"
+        
+        f"🔥 *Начните прямо сейчас - это бесплатно и займет 5 секунд!*"
+    )
+    
+    # Отправляем сообщение
+    bot.send_message(
+        message.chat.id, 
+        welcome_msg, 
+        reply_markup=markup,
+        parse_mode='Markdown'
+    )
+
 # ========== АДМИН СИСТЕМА ==========
 def is_admin(user_id, min_level=1):
     """Проверка, является ли пользователь админом определенного уровня"""
@@ -1697,15 +1801,36 @@ def delete_links_in_group(message):
 @bot.message_handler(commands=['start'])
 def start_command(message):
     user = message.from_user
+    user_id = str(user.id)
+    
+    # Убираем из списка новых пользователей (если там был)
+    if user_id in NEW_USERS:
+        del NEW_USERS[user_id]
+    
+    # Проверяем, есть ли уже такой пользователь
+    user_exists = user_id in db.users
     user_data = db.get_user(user.id)
     
-    # Обновляем имя пользователя если изменилось
+    # Обновляем информацию о пользователе
     if user.username:
         user_data['username'] = user.username
     user_data['first_name'] = user.first_name
+    
+    # Устанавливаем ник для топа если его нет
+    if 'top_nickname' not in user_data:
+        user_data['top_nickname'] = user.first_name
+    
+    # Добавляем время регистрации для новых пользователей
+    if not user_exists:
+        user_data['registered_at'] = datetime.now().isoformat()
+        user_data['is_new'] = True
+        print(f"👤 Зарегистрирован новый пользователь: {user_id} ({user.first_name})")
+    
+    # Сохраняем данные
     db.save_data()
     
-    if db.is_banned(str(user.id)):
+    # Проверяем бан (только для существующих пользователей)
+    if user_exists and db.is_banned(user_id):
         ban_time_left = db.get_ban_time_left(user.id)
         days_left = int(ban_time_left // 86400)
         hours_left = int((ban_time_left % 86400) // 3600)
@@ -1719,18 +1844,59 @@ def start_command(message):
         bot.send_message(message.chat.id, ban_text)
         return
     
-    welcome_text = (
-        f"🎣 Привет, {user.first_name}!\n"
-        f"Добро пожаловать в мир рыбалки!\n\n"
-        f"📍 Текущий водоем: {user_data['current_location']}\n"
-        f"🐛 Червяков: {user_data['worms']}/10\n"
-        f"💰 {COINS_NAME}: {user_data['coins']}\n"
-        f"🐟 Всего поймано: {user_data['total_fish']}\n"
-        f"🎣 Уровень: {user_data['fishing_level']}\n\n"
-        f"♻️ Червяки пополняются каждые 15 минут!\n"
-        f"🌊 Меняйте водоемы для разной рыбы!\n\n"
-        f"Используй кнопки ниже для игры!\n\n"
-        f"Если хотите поддержать: ||2200702034105283||"
+    # Формируем приветственное сообщение
+    if not user_exists:
+        # Сообщение для НОВОГО пользователя
+        welcome_text = (
+            f"🎉 *ПОЗДРАВЛЯЕМ С РЕГИСТРАЦИЕЙ, {user.first_name}!*\n\n"
+            
+            f"✅ *Ваш профиль создан!*\n"
+            f"🆔 ID: `{user_id}`\n"
+            f"📅 Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n"
+            
+            f"💰 *Стартовый набор:*\n"
+            f"• 🐛 {user_data['worms']}/10 червяков\n"
+            f"• 💰 {user_data['coins']} {COINS_NAME}\n"
+            f"• 🎣 Удочка: {user_data['current_rod']}\n"
+            f"• 🪱 Приманка: {user_data['current_bait']}\n\n"
+            
+            f"⚙️ *Важные настройки:*\n"
+            f"• Ваш ник для топа: *{user_data['top_nickname']}*\n"
+            f"• Изменить ник: /настройки\n"
+            f"• Правила игры: /help\n\n"
+            
+            f"🎮 *Начните играть:*\n"
+            f"1. 🎣 Начать рыбалку\n"
+            f"2. 🌊 Сменить водоем\n"
+            f"3. 📊 Посмотреть статистику\n\n"
+            
+            f"🔥 *Удачи на рыбалке!* 🎣"
+        )
+    else:
+        # Сообщение для СУЩЕСТВУЮЩЕГО пользователя
+        welcome_text = (
+            f"👋 *С возвращением, {user.first_name}!*\n\n"
+            
+            f"📊 *Ваша статистика:*\n"
+            f"📍 Водоем: {user_data['current_location']}\n"
+            f"🐛 Червяков: {user_data['worms']}/10\n"
+            f"💰 {COINS_NAME}: {user_data['coins']}\n"
+            f"🐟 Поймано: {user_data['total_fish']} рыб\n"
+            f"🎣 Уровень: {user_data['fishing_level']}\n\n"
+            
+            f"⚙️ *Ваш профиль:*\n"
+            f"• Ник в топе: *{user_data.get('top_nickname', user.first_name)}*\n"
+            f"• Зарегистрирован: {datetime.fromisoformat(user_data.get('registered_at', datetime.now().isoformat())).strftime('%d.%m.%Y')}\n\n"
+            
+            f"🎮 *Продолжайте играть!*"
+        )
+    
+    # Отправляем сообщение с клавиатурой
+    bot.send_message(
+        message.chat.id, 
+        welcome_text, 
+        reply_markup=create_main_keyboard(user.id),
+        parse_mode='Markdown'
     )
     
     bot.send_message(message.chat.id, welcome_text, reply_markup=create_main_keyboard(user.id))
@@ -4119,6 +4285,204 @@ def admin_all_logs_handler(message):
                     "Пример:\n"
                     "/логи actions",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
+    
+@bot.callback_query_handler(func=lambda call: True)
+def callback_handler(call):
+    user = call.from_user
+    
+    # ========== ОБРАБОТКА КНОПОК ДЛЯ НОВЫХ ПОЛЬЗОВАТЕЛЕЙ ==========
+    if call.data == 'first_time_start_command':
+        # Отправляем команду /start
+        start_command(call.message)
+        bot.answer_callback_query(call.id, "✅ Регистрация начата!")
+        return
+    
+    elif call.data == 'first_time_help':
+        # Показываем информацию об игре
+        help_info = (
+            f"🎣 *ИГРА \"РЫБАЛКА\"*\n\n"
+            f"📍 *Что это?*\n"
+            f"Увлекательная игра-симулятор рыбалки в реальных водоемах России!\n\n"
+            f"🎮 *Основные возможности:*\n"
+            f"• 🐟 100+ видов реальной рыбы России\n"
+            f"• 🌊 10 реальных водоемов (Байкал, Волга и др.)\n"
+            f"• 🎣 30+ видов удочек и снастей\n"
+            f"• 🪱 30+ видов приманок\n"
+            f"• 🏆 Рейтинги и соревнования\n"
+            f"• ⚙️ Настройка профиля и ника\n\n"
+            f"💰 *Экономика:*\n"
+            f"• Зарабатывайте {COINS_NAME} продавая рыбу\n"
+            f"• Покупайте лучшие снасти\n"
+            f"• Улучшайте удочки\n"
+            f"• Участвуйте в ежедневных заданиях\n\n"
+            f"👥 *Социальные функции:*\n"
+            f"• Соревнуйтесь с друзьями\n"
+            f"• Поднимайтесь в топах\n"
+            f"• Настройте уникальный ник\n\n"
+            f"🔥 *Игра абсолютно бесплатна!*\n\n"
+            f"🎯 *Как начать?*\n"
+            f"Нажмите кнопку \"🎣 НАЧАТЬ ИГРУ\" ниже!"
+        )
+        
+        markup = types.InlineKeyboardMarkup()
+        btn_start = types.InlineKeyboardButton('🎣 НАЧАТЬ ИГРУ', callback_data='first_time_start_command')
+        markup.add(btn_start)
+        
+        bot.edit_message_text(
+            help_info, 
+            call.message.chat.id, 
+            call.message.message_id,
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
+        return
+    
+    # ========== ОБРАБОТКА КНОПОК НАСТРОЕК ==========
+    elif call.data == 'settings_preview_top':
+        user_data = db.get_user(user.id)
+        nickname = user_data.get('top_nickname', user.first_name)
+        hide_from_top = user_data.get('hide_from_top', False)
+        
+        if hide_from_top:
+            preview_text = f"👻 *Вы скрыты из топа!*\n\nНик '{nickname}' не будет отображаться в рейтингах."
+        else:
+            # Показываем как будет выглядеть в топе
+            preview_text = (
+                f"👀 *Как вас видят в топе:*\n\n"
+                f"🏆 **Топ игроков**\n\n"
+                f"🥇 *{nickname}* - 15000 {COINS_NAME}\n"
+                f"   🎣 Ур. 25 | 🐟 300\n\n"
+                f"🥈 Другой игрок - 12000 {COINS_NAME}\n"
+                f"   🎣 Ур. 20 | 🐟 250\n\n"
+                f"🥉 Третий игрок - 10000 {COINS_NAME}\n"
+                f"   🎣 Ур. 18 | 🐟 200\n\n"
+                f"⬇️ Так будет выглядеть ваш ник в рейтинге!"
+            )
+        
+        markup = types.InlineKeyboardMarkup()
+        btn_back = types.InlineKeyboardButton('🔙 Назад к настройкам', callback_data='menu')
+        markup.add(btn_back)
+        
+        bot.edit_message_text(preview_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+        return
+    
+    # ========== ОБРАБОТКА КНОПОК ИЗ НАСТРОЕК ==========
+    elif call.data == 'settings_change_nickname':
+        # Просим ввести новый ник
+        msg = bot.send_message(call.message.chat.id,
+                              f"📝 *Введите новый ник для топа:*\n\n"
+                              f"📌 Правила:\n"
+                              f"• От 2 до 20 символов\n"
+                              f"• Можно использовать буквы, цифры, пробелы\n"
+                              f"• Нельзя использовать специальные символы\n\n"
+                              f"📋 Примеры: Рыболов, Мастер Удочки, Капитан Немо\n\n"
+                              f"✏️ *Введите новый ник:*")
+        
+        # Регистрируем следующий шаг для этого пользователя
+        bot.register_next_step_handler(msg, process_nickname_input, user.id)
+        return
+    
+    elif call.data == 'settings_reset_nickname':
+        # Сбрасываем ник на имя пользователя
+        user_data = db.get_user(user.id)
+        old_nickname = user_data.get('top_nickname', user.first_name)
+        user_data['top_nickname'] = user.first_name
+        db.save_data()
+        
+        bot.answer_callback_query(call.id, f"✅ Ник сброшен на '{user.first_name}'")
+        
+        # Обновляем сообщение настроек
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        btn_nickname = types.InlineKeyboardButton(f'📝 Ник: {user.first_name[:10]}...', callback_data='settings_change_nickname')
+        btn_hide = types.InlineKeyboardButton(f'👁️ ❌ Виден в топе', callback_data='settings_toggle_hide')
+        btn_reset = types.InlineKeyboardButton('🔄 Сбросить ник', callback_data='settings_reset_nickname')
+        btn_preview = types.InlineKeyboardButton('👀 Посмотреть в топе', callback_data='settings_preview_top')
+        btn_back = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+        markup.add(btn_nickname, btn_hide, btn_reset, btn_preview, btn_back)
+        
+        bot.edit_message_text(
+            f"⚙️ *Настройки профиля*\n\n"
+            f"👤 Ваш ник в топе: *{user.first_name}*\n"
+            f"👁️ Статус в топе: *Виден* 👁️\n\n"
+            f"✅ Ник успешно сброшен!",
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=markup
+        )
+        return
+    
+    elif call.data == 'settings_toggle_hide':
+        # Переключаем скрытие из топа
+        user_data = db.get_user(user.id)
+        current_state = user_data.get('hide_from_top', False)
+        user_data['hide_from_top'] = not current_state
+        db.save_data()
+        
+        new_state = user_data['hide_from_top']
+        nickname = user_data.get('top_nickname', user.first_name)
+        
+        if new_state:
+            bot.answer_callback_query(call.id, "👻 Вы скрыты из топа")
+        else:
+            bot.answer_callback_query(call.id, "👁️ Вы видимы в топе")
+        
+        # Обновляем сообщение настроек
+        hide_text = "✅ Скрыт из топа" if new_state else "❌ Виден в топе"
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        btn_nickname = types.InlineKeyboardButton(f'📝 Ник: {nickname[:10]}...', callback_data='settings_change_nickname')
+        btn_hide = types.InlineKeyboardButton(f'👁️ {hide_text}', callback_data='settings_toggle_hide')
+        btn_reset = types.InlineKeyboardButton('🔄 Сбросить ник', callback_data='settings_reset_nickname')
+        btn_preview = types.InlineKeyboardButton('👀 Посмотреть в топе', callback_data='settings_preview_top')
+        btn_back = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+        markup.add(btn_nickname, btn_hide, btn_reset, btn_preview, btn_back)
+        
+        status_text = "*Скрыт* 👻" if new_state else "*Виден* 👁️"
+        
+        bot.edit_message_text(
+            f"⚙️ *Настройки профиля*\n\n"
+            f"👤 Ваш ник в топе: *{nickname}*\n"
+            f"👁️ Статус в топе: {status_text}\n\n"
+            f"✅ Настройка сохранена!",
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=markup
+        )
+        return
+    
+    # ========== ПРОДОЛЖАЕМ СТАРЫЕ ОБРАБОТЧИКИ ==========
+    # ВАЖНО: оставьте весь существующий код после этой точки НЕТРОНУТЫМ!
+    
+    # Обычный обработчик меню
+    if call.data == 'menu':
+        bot.edit_message_text("Возвращаю в главное меню:", 
+                            call.message.chat.id, 
+                            call.message.message_id)
+        bot.send_message(call.message.chat.id, "Выберите действие:", reply_markup=create_main_keyboard(user.id))
+    
+    # Обработчик выбора водоема
+    elif call.data.startswith('select_location_'):
+        location_index = int(call.data.split('_')[2])
+        water_body = WATER_BODIES[location_index]
+        db.set_current_location(user.id, water_body['name'])
+        
+        markup = types.InlineKeyboardMarkup()
+        btn_fish = types.InlineKeyboardButton('🐟 Рыба этого водоема', callback_data=f'location_fish_{location_index}')
+        btn_menu = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+        markup.add(btn_fish, btn_menu)
+        
+        text = (
+            f"✅ *Водоем изменен!*\n\n"
+            f"{water_body['emoji']} *{water_body['name']}*\n"
+            f"📝 {water_body['description']}\n"
+            f"📍 Координаты: {water_body['coordinates']}\n"
+            f"🎣 Сложность: {water_body['difficulty']}\n\n"
+            f"Теперь вы можете ловить рыбу в этом водоеме!"
+        )
+        
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    
+    # ... и ВСЕ остальные существующие обработчики callback ...
+    # НЕ УДАЛЯЙТЕ и НЕ ИЗМЕНЯЙТЕ существующий код ниже!
 
 # ========== CALLBACK ОБРАБОТЧИКИ ==========
 @bot.callback_query_handler(func=lambda call: True)
