@@ -1371,36 +1371,155 @@ class UserDatabase:
 
 db = UserDatabase()
 
-# ========== ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ДЛЯ ПРОВЕРКИ ПЕРВОГО ВХОДА ==========
+# ========== СИСТЕМА ПРОВЕРКИ РЕГИСТРАЦИИ ==========
+
+# Глобальная переменная для новых пользователей
+NEW_USERS = {}  # user_id: timestamp
+
+def is_user_registered(user_id):
+    """Проверяет, зарегистрирован ли пользователь в базе"""
+    user_id = str(user_id)
+    
+    # Проверяем, есть ли пользователь в базе
+    if user_id not in db.users:
+        return False
+    
+    # Проверяем, что у пользователя есть основные поля
+    user_data = db.users[user_id]
+    
+    # Минимальные обязательные поля
+    required_fields = ['coins', 'worms', 'inventory']
+    for field in required_fields:
+        if field not in user_data:
+            return False
+    
+    return True
+
+def check_registration(message, allow_anonymous=False):
+    """
+    Проверяет регистрацию пользователя
+    
+    Args:
+        message: сообщение от пользователя
+        allow_anonymous: если True, команда доступна без регистрации
+    Returns:
+        bool: True если пользователь зарегистрирован или команда доступна анонимно
+    """
+    user = message.from_user
+    user_id = str(user.id)
+    
+    # Если команда доступна без регистрации (/help, /start)
+    if allow_anonymous:
+        return True
+    
+    # Проверяем регистрацию
+    if not is_user_registered(user_id):
+        # Показываем сообщение о необходимости регистрации
+        global NEW_USERS
+        current_time = time.time()
+        
+        # Не спамим сообщениями (максимум 1 раз в 30 секунд)
+        if user_id not in NEW_USERS or (current_time - NEW_USERS.get(user_id, 0)) > 30:
+            NEW_USERS[user_id] = current_time
+            show_start_required_message(message)
+        
+        return False
+    
+    # Проверяем, не забанен ли пользователь
+    if db.is_banned(user_id):
+        ban_time_left = db.get_ban_time_left(user_id)
+        if ban_time_left > 0:
+            days_left = int(ban_time_left // 86400)
+            hours_left = int((ban_time_left % 86400) // 3600)
+            minutes_left = int((ban_time_left % 3600) // 60)
+            
+            ban_text = (
+                f"🚫 {user.first_name}, ты забанен!\n\n"
+                f"⏳ Бан истечет через: {days_left}д {hours_left}ч {minutes_left}мин\n"
+                f"Ожидайте окончания бана для продолжения игры."
+            )
+            bot.send_message(message.chat.id, ban_text)
+        return False
+    
+    return True
+
+def show_start_required_message(message):
+    """Показывает сообщение о необходимости начать игру"""
+    global NEW_USERS
+    user = message.from_user
+    
+    # Создаем кнопки
+    markup = types.InlineKeyboardMarkup()
+    btn_start = types.InlineKeyboardButton('🎣 НАЧАТЬ ИГРУ', callback_data='first_time_start_command')
+    btn_help = types.InlineKeyboardButton('❓ ЧТО ЭТО ЗА ИГРА?', callback_data='first_time_help')
+    markup.add(btn_start, btn_help)
+    
+    # Текст сообщения
+    welcome_msg = (
+        f"👋 *Привет, {user.first_name}!*\n\n"
+        f"🎣 *Добро пожаловать в игру \"РЫБАЛКА\"!*\n\n"
+        f"📝 *Чтобы начать играть, нужно:*\n"
+        f"1. **Нажать кнопку \"НАЧАТЬ ИГРУ\"**\n"
+        f"2. **Создать игровой профиль**\n"
+        f"3. **Настроить уникальный ник**\n\n"
+        f"⚙️ *Это нужно для:*\n"
+        f"• Сохранения вашего прогресса\n"
+        f"• Участия в рейтингах\n"
+        f"• Покупки снастей и улучшений\n\n"
+        f"🔥 *Начните прямо сейчас!*"
+    )
+    
+    bot.send_message(
+        message.chat.id, 
+        welcome_msg, 
+        reply_markup=markup,
+        parse_mode='Markdown'
+    )
+
+# Глобальный обработчик всех сообщений
 @bot.message_handler(func=lambda message: True, content_types=['text'])
+def global_message_handler(message):
+    """Проверяет все сообщения на регистрацию"""
+    user = message.from_user
+    user_id = str(user.id)
+    
+    # Если это команда
+    if message.text and message.text.startswith('/'):
+        # Команды /start и /help доступны без регистрации
+        if message.text.startswith('/start') or message.text.startswith('/help'):
+            return
+        # Для других команд проверяем регистрацию
+        elif not check_registration(message, allow_anonymous=False):
+            return
+        return
+    
+    # Для обычных сообщений тоже проверяем регистрацию
+    if not check_registration(message, allow_anonymous=False):
+        return
+    
+    # Проверка ссылок в группах (если сообщение в группе)
+    if message.chat.type in ['group', 'supergroup']:
+        delete_links_in_group(message)
+
+# ========== ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ДЛЯ ПРОВЕРКИ ПЕРВОГО ВХОДА ==========
 def global_message_handler(message):
     """Проверяем все сообщения на первый вход"""
     user = message.from_user
     user_id = str(user.id)
     
-    # ИГНОРИРУЕМ команды (их обработают другие хендлеры)
+    # ИГНОРИРУЕМ команды
     if message.text and message.text.startswith('/'):
-        # Если это команда /start, просто пропускаем
-        if message.text.startswith('/start'):
-            return
-        # Для других команд проверяем, есть ли пользователь в базе
-        else:
-            # Проверяем, существует ли пользователь в базе
-            user_in_db = user_id in db.users
-            
-            if not user_in_db:
-                # Пользователь пытается использовать команду без регистрации
-                show_start_required_message(message)
-                return
+        return
     
     # Проверяем, есть ли пользователь в базе данных
+    # ВАЖНО: Используем db.users напрямую для проверки
     user_in_db = user_id in db.users
     
     # Если пользователя НЕТ в базе
     if not user_in_db:
         # Проверяем, не показывали ли мы уже сообщение этому пользователю
-        # (чтобы не спамить сообщением на каждое его сообщение)
-        if user_id not in NEW_USERS or (time.time() - NEW_USERS[user_id]) > 60:
+        global NEW_USERS
+        if user_id not in NEW_USERS or (time.time() - NEW_USERS.get(user_id, 0)) > 60:
             # Запоминаем когда показывали сообщение
             NEW_USERS[user_id] = time.time()
             
@@ -1412,7 +1531,7 @@ def global_message_handler(message):
     if db.is_banned(user_id):
         return
     
-    # Проверяем ссылки в группах (если сообщение в группе)
+    # Проверяем ссылки в группах
     if message.chat.type in ['group', 'supergroup']:
         delete_links_in_group(message)
 
@@ -1803,34 +1922,33 @@ def start_command(message):
     user = message.from_user
     user_id = str(user.id)
     
-    # Убираем из списка новых пользователей (если там был)
+    # Удаляем из списка ожидания регистрации
+    global NEW_USERS
     if user_id in NEW_USERS:
         del NEW_USERS[user_id]
     
-    # Проверяем, есть ли уже такой пользователь
-    user_exists = user_id in db.users
+    # Получаем или создаем пользователя
     user_data = db.get_user(user.id)
     
-    # Обновляем информацию о пользователе
+    # Обновляем информацию
     if user.username:
         user_data['username'] = user.username
     user_data['first_name'] = user.first_name
     
-    # Устанавливаем ник для топа если его нет
+    # Устанавливаем ник для топа
     if 'top_nickname' not in user_data:
         user_data['top_nickname'] = user.first_name
     
-    # Добавляем время регистрации для новых пользователей
-    if not user_exists:
+    # Отмечаем время регистрации для новых пользователей
+    if 'registered_at' not in user_data:
         user_data['registered_at'] = datetime.now().isoformat()
-        user_data['is_new'] = True
-        print(f"👤 Зарегистрирован новый пользователь: {user_id} ({user.first_name})")
+        print(f"👤 Новый пользователь: {user_id} ({user.first_name})")
     
-    # Сохраняем данные
+    # Сохраняем
     db.save_data()
     
-    # Проверяем бан (только для существующих пользователей)
-    if user_exists and db.is_banned(user_id):
+    # Проверяем бан
+    if db.is_banned(user_id):
         ban_time_left = db.get_ban_time_left(user.id)
         days_left = int(ban_time_left // 86400)
         hours_left = int((ban_time_left % 86400) // 3600)
@@ -1844,65 +1962,28 @@ def start_command(message):
         bot.send_message(message.chat.id, ban_text)
         return
     
-    # Формируем приветственное сообщение
-    if not user_exists:
-        # Сообщение для НОВОГО пользователя
-        welcome_text = (
-            f"🎉 *ПОЗДРАВЛЯЕМ С РЕГИСТРАЦИЕЙ, {user.first_name}!*\n\n"
-            
-            f"✅ *Ваш профиль создан!*\n"
-            f"🆔 ID: `{user_id}`\n"
-            f"📅 Дата: {datetime.now().strftime('%d.%m.%Y %H:%M')}\n\n"
-            
-            f"💰 *Стартовый набор:*\n"
-            f"• 🐛 {user_data['worms']}/10 червяков\n"
-            f"• 💰 {user_data['coins']} {COINS_NAME}\n"
-            f"• 🎣 Удочка: {user_data['current_rod']}\n"
-            f"• 🪱 Приманка: {user_data['current_bait']}\n\n"
-            
-            f"⚙️ *Важные настройки:*\n"
-            f"• Ваш ник для топа: *{user_data['top_nickname']}*\n"
-            f"• Изменить ник: /настройки\n"
-            f"• Правила игры: /help\n\n"
-            
-            f"🎮 *Начните играть:*\n"
-            f"1. 🎣 Начать рыбалку\n"
-            f"2. 🌊 Сменить водоем\n"
-            f"3. 📊 Посмотреть статистику\n\n"
-            
-            f"🔥 *Удачи на рыбалке!* 🎣"
-        )
-    else:
-        # Сообщение для СУЩЕСТВУЮЩЕГО пользователя
-        welcome_text = (
-            f"👋 *С возвращением, {user.first_name}!*\n\n"
-            
-            f"📊 *Ваша статистика:*\n"
-            f"📍 Водоем: {user_data['current_location']}\n"
-            f"🐛 Червяков: {user_data['worms']}/10\n"
-            f"💰 {COINS_NAME}: {user_data['coins']}\n"
-            f"🐟 Поймано: {user_data['total_fish']} рыб\n"
-            f"🎣 Уровень: {user_data['fishing_level']}\n\n"
-            
-            f"⚙️ *Ваш профиль:*\n"
-            f"• Ник в топе: *{user_data.get('top_nickname', user.first_name)}*\n"
-            f"• Зарегистрирован: {datetime.fromisoformat(user_data.get('registered_at', datetime.now().isoformat())).strftime('%d.%m.%Y')}\n\n"
-            
-            f"🎮 *Продолжайте играть!*"
-        )
-    
-    # Отправляем сообщение с клавиатурой
-    bot.send_message(
-        message.chat.id, 
-        welcome_text, 
-        reply_markup=create_main_keyboard(user.id),
-        parse_mode='Markdown'
+    # Приветственное сообщение
+    welcome_text = (
+        f"🎉 *Добро пожаловать, {user.first_name}!*\n\n"
+        f"✅ *Профиль создан/обновлен*\n"
+        f"🆔 ID: `{user_id}`\n"
+        f"💰 Баланс: {user_data['coins']} {COINS_NAME}\n"
+        f"🐛 Червяков: {user_data['worms']}/10\n\n"
+        f"⚙️ *Ваш ник для топа:* {user_data['top_nickname']}\n"
+        f"✏️ Изменить: /настройки\n\n"
+        f"🎮 *Начните играть!*"
     )
+    
+    bot.send_message(message.chat.id, welcome_text, 
+                    reply_markup=create_main_keyboard(user.id),
+                    parse_mode='Markdown')
     
     bot.send_message(message.chat.id, welcome_text, reply_markup=create_main_keyboard(user.id))
 
 @bot.message_handler(commands=['help'])
 def help_command(message):
+    if not check_registration(message, allow_anonymous=True):
+        return
     user = message.from_user
     user_data = db.get_user(user.id)
     
@@ -2137,6 +2218,8 @@ def location_command(message):
 
 @bot.message_handler(commands=['stats'])
 def stats_command(message):
+    if not check_registration(message, allow_anonymous=False):
+        return
     user = message.from_user
     if db.is_banned(str(user.id)):
         return
@@ -2184,6 +2267,8 @@ def stats_command(message):
 
 @bot.message_handler(commands=['inventory'])
 def inventory_command(message):
+    if not check_registration(message, allow_anonymous=False):
+        return
     user = message.from_user
     if db.is_banned(str(user.id)):
         return
@@ -2230,6 +2315,8 @@ def inventory_command(message):
 
 @bot.message_handler(commands=['shop'])
 def shop_command(message):
+    if not check_registration(message, allow_anonymous=False):
+        return
     user = message.from_user
     if db.is_banned(str(user.id)):
         return
@@ -2253,6 +2340,8 @@ def shop_command(message):
 
 @bot.message_handler(commands=['sell'])
 def sell_command(message):
+    if not check_registration(message, allow_anonymous=False):
+        return
     user = message.from_user
     if db.is_banned(str(user.id)):
         return
@@ -2295,6 +2384,8 @@ def sell_command(message):
 
 @bot.message_handler(commands=['quests'])
 def quests_command(message):
+    if not check_registration(message, allow_anonymous=False):
+        return
     user = message.from_user
     if db.is_banned(str(user.id)):
         return
@@ -2321,6 +2412,8 @@ def quests_command(message):
 
 @bot.message_handler(commands=['top', 'топ'])
 def top_command(message):
+    if not check_registration(message, allow_anonymous=False):
+        return
     user = message.from_user
     if db.is_banned(str(user.id)):
         return
@@ -2342,6 +2435,8 @@ def top_command(message):
 
 @bot.message_handler(commands=['donate', 'донат'])
 def donate_command(message):
+    if not check_registration(message, allow_anonymous=False):
+        return
     user = message.from_user
     if db.is_banned(str(user.id)):
         return
@@ -2399,6 +2494,8 @@ def save_command(message):
 
 @bot.message_handler(commands=['fishing'])
 def fishing_command_handler(message):
+    if not check_registration(message, allow_anonymous=False):
+        return
     user = message.from_user
     if db.is_banned(str(user.id)):
         return
@@ -2539,6 +2636,8 @@ def fishing_command_handler(message):
 # Примерно строка 1850
 @bot.message_handler(commands=['приманка', 'bait'])
 def select_bait_command(message):
+    if not check_registration(message, allow_anonymous=False):
+        return
     user = message.from_user
     user_data = db.get_user(user.id)
     
@@ -2567,6 +2666,8 @@ def select_bait_command(message):
 # ========== НАСТРОЙКИ ==========
 @bot.message_handler(commands=['settings', 'настройки'])
 def settings_command(message):
+    if not check_registration(message, allow_anonymous=False):
+        return
     user = message.from_user
     user_data = db.get_user(user.id)
     
@@ -4488,6 +4589,66 @@ def callback_handler(call):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
     user = call.from_user
+    
+    # ========== КНОПКИ ДЛЯ НОВЫХ ПОЛЬЗОВАТЕЛЕЙ ==========
+    if call.data == 'first_time_start_command':
+        # Удаляем из списка ожидания
+        global NEW_USERS
+        user_id = str(user.id)
+        if user_id in NEW_USERS:
+            del NEW_USERS[user_id]
+        
+        # Создаем фейковое сообщение с командой /start
+        class FakeMessage:
+            def __init__(self, user, chat_id):
+                self.from_user = user
+                self.chat = type('obj', (object,), {'id': chat_id})()
+                self.text = '/start'
+        
+        fake_message = FakeMessage(user, call.message.chat.id)
+        
+        # Вызываем команду /start
+        start_command(fake_message)
+        
+        # Удаляем старое сообщение
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except:
+            pass
+        
+        bot.answer_callback_query(call.id, "✅ Регистрация завершена!")
+        return
+    
+    elif call.data == 'first_time_help':
+        # Показываем информацию об игре
+        help_info = (
+            f"🎣 *ИГРА \"РЫБАЛКА\"*\n\n"
+            f"📍 *Реалистичный симулятор рыбалки*\n"
+            f"• 100+ видов рыбы России\n"
+            f"• 10 реальных водоемов\n"
+            f"• Система улучшения снастей\n"
+            f"• Рейтинги и соревнования\n\n"
+            f"🎮 *Как играть:*\n"
+            f"1. Зарегистрируйтесь (/start)\n"
+            f"2. Ловите рыбу\n"
+            f"3. Продавайте улов\n"
+            f"4. Покупайте снасти\n"
+            f"5. Участвуйте в топах\n\n"
+            f"🔥 *Начните прямо сейчас!*"
+        )
+        
+        markup = types.InlineKeyboardMarkup()
+        btn_start = types.InlineKeyboardButton('🎣 НАЧАТЬ ИГРУ', callback_data='first_time_start_command')
+        markup.add(btn_start)
+        
+        bot.edit_message_text(
+            help_info, 
+            call.message.chat.id, 
+            call.message.message_id,
+            reply_markup=markup,
+            parse_mode='Markdown'
+        )
+        return
     
     if call.data == 'menu':
         bot.edit_message_text("Возвращаю в главное меню:", 
