@@ -1396,52 +1396,51 @@ def is_user_registered(user_id):
     return True
 
 def check_registration(message, allow_anonymous=False):
-    """
-    Проверяет регистрацию пользователя
-    
-    Args:
-        message: сообщение от пользователя
-        allow_anonymous: если True, команда доступна без регистрации
-    Returns:
-        bool: True если пользователь зарегистрирован или команда доступна анонимно
-    """
+    """Проверяет регистрацию пользователя"""
     user = message.from_user
     user_id = str(user.id)
     
-    # Если команда доступна без регистрации (/help, /start)
-    if allow_anonymous:
+    # В группах не проверяем регистрацию (только модерация)
+    if message.chat.type in ['group', 'supergroup']:
         return True
     
-    # Проверяем регистрацию
-    if not is_user_registered(user_id):
-        # Показываем сообщение о необходимости регистрации
-        global NEW_USERS
-        current_time = time.time()
+    # В личных сообщениях проверяем
+    if message.chat.type == 'private':
+        # Если команда доступна без регистрации
+        if allow_anonymous:
+            return True
         
-        # Не спамим сообщениями (максимум 1 раз в 30 секунд)
-        if user_id not in NEW_USERS or (current_time - NEW_USERS.get(user_id, 0)) > 30:
-            NEW_USERS[user_id] = current_time
-            show_start_required_message(message)
-        
-        return False
-    
-    # Проверяем, не забанен ли пользователь
-    if db.is_banned(user_id):
-        ban_time_left = db.get_ban_time_left(user_id)
-        if ban_time_left > 0:
-            days_left = int(ban_time_left // 86400)
-            hours_left = int((ban_time_left % 86400) // 3600)
-            minutes_left = int((ban_time_left % 3600) // 60)
+        # Проверяем регистрацию
+        if not is_user_registered(user_id):
+            global NEW_USERS
+            current_time = time.time()
             
-            ban_text = (
-                f"🚫 {user.first_name}, ты забанен!\n\n"
-                f"⏳ Бан истечет через: {days_left}д {hours_left}ч {minutes_left}мин\n"
-                f"Ожидайте окончания бана для продолжения игры."
-            )
-            bot.send_message(message.chat.id, ban_text)
-        return False
+            # Не спамим сообщениями
+            if user_id not in NEW_USERS or (current_time - NEW_USERS.get(user_id, 0)) > 30:
+                NEW_USERS[user_id] = current_time
+                show_start_required_message(message)
+            
+            return False
+        
+        # Проверяем бан
+        if db.is_banned(user_id):
+            ban_time_left = db.get_ban_time_left(user_id)
+            if ban_time_left > 0:
+                days_left = int(ban_time_left // 86400)
+                hours_left = int((ban_time_left % 86400) // 3600)
+                minutes_left = int((ban_time_left % 3600) // 60)
+                
+                ban_text = (
+                    f"🚫 {user.first_name}, ты забанен!\n\n"
+                    f"⏳ Бан истечет через: {days_left}д {hours_left}ч {minutes_left}мин\n"
+                    f"Ожидайте окончания бана для продолжения игры."
+                )
+                bot.send_message(message.chat.id, ban_text)
+            return False
+        
+        return True
     
-    return True
+    return False
 
 def show_start_required_message(message):
     """Показывает сообщение о необходимости начать игру"""
@@ -1479,16 +1478,16 @@ def show_start_required_message(message):
 # Глобальный обработчик всех сообщений
 # Глобальный обработчик всех НЕ-КОМАНДНЫХ сообщений
 @bot.message_handler(func=lambda message: True, content_types=['text'])
-def global_message_handler(message):
-    """Обрабатывает только обычные текстовые сообщения (не команды и не кнопки)"""
+def handle_text_messages(message):
+    """Обрабатывает только обычные текстовые сообщения (не команды)"""
     user = message.from_user
     user_id = str(user.id)
     
-    # Пропускаем если это команда (начинается с /)
+    # Пропускаем команды
     if message.text and message.text.startswith('/'):
         return
     
-    # Пропускаем если это текст кнопки из главного меню
+    # Пропускаем кнопки главного меню
     main_menu_buttons = [
         '🎣 Начать рыбалку', '🌊 Сменить водоем', '📊 Статистика',
         '🎒 Инвентарь', '🛒 Магазин', '💰 Продать рыбу',
@@ -1499,42 +1498,18 @@ def global_message_handler(message):
     ]
     
     if message.text in main_menu_buttons:
-        return  # Это обрабатывается другими хендлерами
-    
-    # Пропускаем если это админская кнопка
-    admin_buttons = [
-        '🚫 Бан/Разбан', '🔇 Мут/Размут', '⚠️ Предупреждение',
-        '💰 Выдать донат', '📜 Логи банов', '📋 Список админов',
-        '👤 Поиск игрока', '🎣 Выдать предметы', '💰 Выдать монеты',
-        '🌟 Выдать опыт', '📊 Статистика бота', '👤 Полная стата',
-        '🔄 Сброс игрока', '⚙️ Полное управление', '🗑️ Очистить логи',
-        '📢 Отправить новость', '📜 Все логи'
-    ]
-    
-    if message.text in admin_buttons:
         return
     
-    # ТОЛЬКО теперь проверяем регистрацию для обычных сообщений
-    if not check_registration(message, allow_anonymous=False):
-        return
+    # Если это ЛИЧНОЕ сообщение (не группа)
+    if message.chat.type == 'private':
+        # Проверяем регистрацию
+        if not check_registration(message, allow_anonymous=False):
+            return
     
-    # Проверка ссылок в группах
+    # В ГРУППАХ проверяем только ссылки
     if message.chat.type in ['group', 'supergroup']:
         delete_links_in_group(message)
         return
-    
-    # Если это личное сообщение и пользователь зарегистрирован
-    if message.chat.type == 'private':
-        # Можно показать подсказку
-        help_text = (
-            f"👋 {user.first_name}, я не понимаю это сообщение!\n\n"
-            f"📋 *Используйте:*\n"
-            f"• Кнопки меню ниже\n"
-            f"• Команды (начинаются с /)\n"
-            f"• /help - для списка команд"
-        )
-        bot.send_message(message.chat.id, help_text, 
-                        reply_markup=create_main_keyboard(user.id))
 
 # ========== ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ДЛЯ ПРОВЕРКИ ПЕРВОГО ВХОДА ==========
 def global_message_handler(message):
@@ -1899,60 +1874,105 @@ def mute_user_in_group(chat_id, user_id, user_name, minutes=60, reason="Нару
         return False
 
 def delete_links_in_group(message):
-    if message.chat.type in ['group', 'supergroup']:
-        text = message.text or message.caption or ""
+    """Удаляет ссылки в группах и выдает предупреждения"""
+    if message.chat.type not in ['group', 'supergroup']:
+        return False  # Работает только в группах
+    
+    text = message.text or message.caption or ""
+    
+    # Проверяем на ссылки (кроме @username)
+    if URL_PATTERN.search(text):
+        has_other_links = False
         
-        if URL_PATTERN.search(text):
-            all_matches = URL_PATTERN.findall(text)
-            has_other_links = False
-            
-            for match_group in all_matches:
-                for match in match_group:
-                    if match and not USERNAME_PATTERN.fullmatch(match):
-                        has_other_links = True
-                        break
-                if has_other_links:
+        for match_group in URL_PATTERN.findall(text):
+            for match in match_group:
+                if match and not USERNAME_PATTERN.fullmatch(match):
+                    has_other_links = True
                     break
-            
             if has_other_links:
+                break
+        
+        if has_other_links:
+            try:
+                user = message.from_user
+                user_id = str(user.id)
+                chat_id = message.chat.id
+                
+                # Пытаемся удалить сообщение
+                bot.delete_message(chat_id, message.message_id)
+                
+                # Выдаем предупреждение
+                banned, warning_count, is_ban = db.add_warning(user_id, chat_id)
+                
+                if is_ban:
+                    # Бан на 2 дня в группе
+                    try:
+                        until_date = int(time.time()) + (2 * 86400)  # 2 дня
+                        bot.ban_chat_member(chat_id, user.id, until_date=until_date)
+                        ban_message = f"🚫 {user.first_name} забанен на 2 дня за 2 ссылки за 24 часа!"
+                    except:
+                        ban_message = f"🚫 {user.first_name} получает бан на 2 дня за 2 ссылки за 24 часа!"
+                    bot.send_message(chat_id, ban_message)
+                else:
+                    warning_message = (
+                        f"⚠️ {user.first_name}, даю предупреждение!\n"
+                        f"На 2 раз даю бан, не кидай ссылки\n"
+                        f"📊 Предупреждений: {warning_count}/2"
+                    )
+                    bot.send_message(chat_id, warning_message)
+                
+                return True
+                
+            except Exception as e:
+                print(f"Ошибка удаления ссылки: {e}")
+                # Если не удалось удалить, хотя бы выдадим предупреждение
                 try:
                     user = message.from_user
-                    user_id = str(user.id)
-                    chat_id = message.chat.id
-                    
-                    if db.is_banned(user_id):
-                        ban_time_left = db.get_ban_time_left(user_id)
-                        days_left = int(ban_time_left // 86400)
-                        hours_left = int((ban_time_left % 86400) // 3600)
-                        minutes_left = int((ban_time_left % 3600) // 60)
-                        
-                        ban_message = (
-                            f"🚫 {user.first_name}, ты уже забанен!\n"
-                            f"⏳ Бан истечет через: {days_left}д {hours_left}ч {minutes_left}мин"
-                        )
-                        bot.send_message(chat_id, ban_message)
-                        return True
-                    
-                    bot.delete_message(chat_id, message.message_id)
-                    banned, warning_count, is_ban = db.add_warning(user_id, chat_id)
-                    
-                    if is_ban:
-                        ban_user_in_group(chat_id, user.id, user.first_name, "2 ссылки за 24 часа")
-                    else:
-                        warning_message = (
-                            f"⚠️ {user.first_name}, даю предупреждение!\n"
-                            f"На 2 раз даю бан, не кидай ссылки\n"
-                            f"📊 Предупреждений: {warning_count}/2"
-                        )
-                        bot.send_message(chat_id, warning_message)
-                    
-                except Exception as e:
-                    print(f"Ошибка удаления ссылки: {e}")
+                    warning_message = f"⚠️ {user.first_name}, не кидай ссылки в чат!"
+                    bot.send_message(message.chat.id, warning_message)
+                except:
+                    pass
                 return True
     return False
 
+# ========== ДЕКОРАТОРЫ ==========
+
+def private_chat_only(func):
+    """
+    Декоратор для команд, которые работают ТОЛЬКО в личных сообщениях
+    
+    Использование:
+    @bot.message_handler(commands=['start'])
+    @private_chat_only
+    def start_command(message):
+        # ... код команды ...
+    """
+    def wrapper(message, *args, **kwargs):
+        # Проверяем тип чата
+        if message.chat.type != 'private':
+            # Если это группа или супергруппа
+            if message.chat.type in ['group', 'supergroup']:
+                # Отправляем сообщение только если это команда (начинается с /)
+                if message.text and message.text.startswith('/'):
+                    reply_text = (
+                        "🤖 *Эта команда работает только в личных сообщениях!*\n\n"
+                        "🎣 Для игры в рыбалку напишите мне в личные сообщения:\n"
+                        "1. Найдите меня в поиске\n"
+                        "2. Нажмите 'Написать сообщение'\n"
+                        "3. Используйте команду /start\n\n"
+                        "⚡ В группах я только проверяю ссылки!"
+                    )
+                    bot.send_message(message.chat.id, reply_text, parse_mode='Markdown')
+            return  # Прерываем выполнение команды в группах
+        
+        # Если это личное сообщение - выполняем оригинальную функцию
+        return func(message, *args, **kwargs)
+    
+    return wrapper
+
 # ========== ОСНОВНЫЕ КОМАНДЫ ==========
 @bot.message_handler(commands=['start'])
+@private_chat_only
 def start_command(message):
     user = message.from_user
     user_id = str(user.id)
@@ -2038,6 +2058,7 @@ def start_command(message):
         print(f"❌ Ошибка отправки сообщения: {e}")
 
 @bot.message_handler(commands=['help'])
+@private_chat_only
 def help_command(message):
     if not check_registration(message, allow_anonymous=True):
         return
@@ -2191,6 +2212,7 @@ def process_support_ticket(message, user_id):
 
 # 3. Затем команда для просмотра своих обращений
 @bot.message_handler(commands=['моиобращения', 'mytickets'])
+@private_chat_only
 def my_tickets_command(message):
     """Показать обращения пользователя"""
     user = message.from_user
@@ -2246,6 +2268,7 @@ def my_tickets_command(message):
                     reply_markup=create_main_keyboard(user.id))
     
 @bot.message_handler(commands=['location', 'водоем'])
+@private_chat_only
 def location_command(message):
     user = message.from_user
     if db.is_banned(str(user.id)):
@@ -2274,6 +2297,7 @@ def location_command(message):
     bot.send_message(message.chat.id, location_text, reply_markup=markup)
 
 @bot.message_handler(commands=['stats'])
+@private_chat_only
 def stats_command(message):
     if not check_registration(message, allow_anonymous=False):
         return
@@ -2323,6 +2347,7 @@ def stats_command(message):
     bot.send_message(message.chat.id, stats_text, reply_markup=create_main_keyboard(user.id))
 
 @bot.message_handler(commands=['inventory'])
+@private_chat_only
 def inventory_command(message):
     if not check_registration(message, allow_anonymous=False):
         return
@@ -2371,6 +2396,7 @@ def inventory_command(message):
     bot.send_message(message.chat.id, inventory_text, reply_markup=create_main_keyboard(user.id))
 
 @bot.message_handler(commands=['shop'])
+@private_chat_only
 def shop_command(message):
     if not check_registration(message, allow_anonymous=False):
         return
@@ -2396,6 +2422,7 @@ def shop_command(message):
     bot.send_message(message.chat.id, shop_text, reply_markup=markup)
 
 @bot.message_handler(commands=['sell'])
+@private_chat_only
 def sell_command(message):
     if not check_registration(message, allow_anonymous=False):
         return
@@ -2440,6 +2467,7 @@ def sell_command(message):
     bot.send_message(message.chat.id, sell_text, reply_markup=markup)
 
 @bot.message_handler(commands=['quests'])
+@private_chat_only
 def quests_command(message):
     if not check_registration(message, allow_anonymous=False):
         return
@@ -2468,6 +2496,7 @@ def quests_command(message):
     bot.send_message(message.chat.id, quests_text, reply_markup=create_main_keyboard(user.id))
 
 @bot.message_handler(commands=['top', 'топ'])
+@private_chat_only
 def top_command(message):
     if not check_registration(message, allow_anonymous=False):
         return
@@ -2491,6 +2520,7 @@ def top_command(message):
     bot.send_message(message.chat.id, top_text, reply_markup=markup)
 
 @bot.message_handler(commands=['donate', 'донат'])
+@private_chat_only
 def donate_command(message):
     if not check_registration(message, allow_anonymous=False):
         return
@@ -2550,6 +2580,7 @@ def save_command(message):
                             message.chat.id, msg.message_id)
 
 @bot.message_handler(commands=['fishing'])
+@private_chat_only
 def fishing_command_handler(message):
     if not check_registration(message, allow_anonymous=False):
         return
@@ -2692,6 +2723,7 @@ def fishing_command_handler(message):
 
 # Примерно строка 1850
 @bot.message_handler(commands=['приманка', 'bait'])
+@private_chat_only
 def select_bait_command(message):
     if not check_registration(message, allow_anonymous=False):
         return
@@ -2722,6 +2754,7 @@ def select_bait_command(message):
 
 # ========== НАСТРОЙКИ ==========
 @bot.message_handler(commands=['settings', 'настройки'])
+@private_chat_only
 def settings_command(message):
     if not check_registration(message, allow_anonymous=False):
         return
@@ -3761,6 +3794,7 @@ def reset_user_command(message):
     bot.send_message(message.chat.id, response)
 
 @bot.message_handler(commands=['send_news', 'Отправить новость', 'новость'])
+@private_chat_only
 def send_news_command(message):
     user = message.from_user
     if not is_admin(user.id, 5):
@@ -3805,6 +3839,7 @@ def send_news_command(message):
     bot.send_message(message.chat.id, response)
 
 @bot.message_handler(commands=['news', 'новости'])
+@private_chat_only
 def public_news_command(message):
     user = message.from_user
     
@@ -4082,63 +4117,78 @@ def show_ticket_command(message):
 
 # ========== ОБРАБОТЧИКИ КНОПОК ==========
 @bot.message_handler(func=lambda msg: msg.text == '🎣 Начать рыбалку')
+@private_chat_only
 def fishing_button_handler(message):
     fishing_command_handler(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '🌊 Сменить водоем')
+@private_chat_only
 def location_button_handler(message):
     location_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '🎣 Забросить удочку')
+@private_chat_only
 def fishing_cast_handler(message):
     fishing_command_handler(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '📊 Статистика')
+@private_chat_only
 def stats_button_handler(message):
     stats_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '🎒 Инвентарь')
+@private_chat_only
 def inventory_button_handler(message):
     inventory_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '🛒 Магазин')
+@private_chat_only
 def shop_button_handler(message):
     shop_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '💰 Продать рыбу')
+@private_chat_only
 def sell_button_handler(message):
     sell_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '📜 Задания')
+@private_chat_only
 def quests_button_handler(message):
     quests_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '🏆 Топ игроков')
+@private_chat_only
 def top_button_handler(message):
     top_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '📰 Новости')
+@private_chat_only
 def news_button_handler(message):
     public_news_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '💰 Донат')
+@private_chat_only
 def donate_button_handler(message):
     donate_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '❓ Помощь')
+@private_chat_only
 def help_button_handler(message):
     help_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '🎣 Выбрать приманку')
+@private_chat_only
 def select_bait_button(message):
     select_bait_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '⚙️ Настройки')
+@private_chat_only
 def settings_button_handler(message):
     """Обработка кнопки настроек"""
     settings_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '👑 Админ панель')
+@private_chat_only
 def admin_panel_handler(message):
     user = message.from_user
     if not is_admin(user.id, 1):
