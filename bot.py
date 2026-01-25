@@ -6177,7 +6177,14 @@ def run():
         print(f"❌ Ошибка загрузки бота: {e}")
         return
     
-    print(f"👥 Пользователей в базе: {len(db.users)}")
+    try:
+        if hasattr(db, 'get_all_users_count'):
+            count = db.get_all_users_count()
+            print(f"Пользователей в базе: {count}")
+        else:
+            print(f"Система базы данных загружена")
+    except:
+        print(f"Бот запущен")
     print(f"🌍 Webhook URL: {WEBHOOK_URL}")
     
     if WEBHOOK_URL:
