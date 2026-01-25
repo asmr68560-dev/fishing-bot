@@ -1475,76 +1475,6 @@ def show_start_required_message(message):
         parse_mode='Markdown'
     )
 
-# Глобальный обработчик всех сообщений
-# Глобальный обработчик всех НЕ-КОМАНДНЫХ сообщений
-@bot.message_handler(func=lambda message: True, content_types=['text'])
-def handle_text_messages(message):
-    """Обрабатывает только обычные текстовые сообщения (не команды)"""
-    user = message.from_user
-    user_id = str(user.id)
-    
-    # Пропускаем команды
-    if message.text and message.text.startswith('/'):
-        return
-    
-    # Пропускаем кнопки главного меню
-    main_menu_buttons = [
-        '🎣 Начать рыбалку', '🌊 Сменить водоем', '📊 Статистика',
-        '🎒 Инвентарь', '🛒 Магазин', '💰 Продать рыбу',
-        '🎣 Выбрать приманку', '⚙️ Настройки', '📜 Задания',
-        '🏆 Топ игроков', '📰 Новости', '💰 Донат',
-        '❓ Помощь', '👑 Админ панель', '📋 Меню',
-        '🎣 Забросить удочку'
-    ]
-    
-    if message.text in main_menu_buttons:
-        return
-    
-    # Если это ЛИЧНОЕ сообщение (не группа)
-    if message.chat.type == 'private':
-        # Проверяем регистрацию
-        if not check_registration(message, allow_anonymous=False):
-            return
-    
-    # В ГРУППАХ проверяем только ссылки
-    if message.chat.type in ['group', 'supergroup']:
-        delete_links_in_group(message)
-        return
-
-# ========== ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ДЛЯ ПРОВЕРКИ ПЕРВОГО ВХОДА ==========
-def global_message_handler(message):
-    """Проверяем все сообщения на первый вход"""
-    user = message.from_user
-    user_id = str(user.id)
-    
-    # ИГНОРИРУЕМ команды
-    if message.text and message.text.startswith('/'):
-        return
-    
-    # Проверяем, есть ли пользователь в базе данных
-    # ВАЖНО: Используем db.users напрямую для проверки
-    user_in_db = user_id in db.users
-    
-    # Если пользователя НЕТ в базе
-    if not user_in_db:
-        # Проверяем, не показывали ли мы уже сообщение этому пользователю
-        global NEW_USERS
-        if user_id not in NEW_USERS or (time.time() - NEW_USERS.get(user_id, 0)) > 60:
-            # Запоминаем когда показывали сообщение
-            NEW_USERS[user_id] = time.time()
-            
-            # Показываем сообщение о необходимости /start
-            show_start_required_message(message)
-        return
-    
-    # Если пользователь ЕСТЬ в базе, но забанен
-    if db.is_banned(user_id):
-        return
-    
-    # Проверяем ссылки в группах
-    if message.chat.type in ['group', 'supergroup']:
-        delete_links_in_group(message)
-
 def show_start_required_message(message):
     """Показать сообщение о необходимости начать игру"""
     user = message.from_user
@@ -2141,9 +2071,14 @@ def help_command(message):
     btn_support = types.InlineKeyboardButton('Техподдержка', callback_data='support_new')
     markup.add(btn_support)
     
-    bot.send_message(message.chat.id, help_text, reply_markup=create_main_keyboard(message.from_user.id))
+    bot.send_message(
+        message.chat.id,
+        help_text,
+        reply_markup=markup,
+        parse_mode='Markdown'
+    )
 
-# 2. Прямо после help_command добавьте process_support_ticket
+# 2. Прямо после help_command добавьтеsupport_ticket
 def process_support_ticket(message, user_id):
     """Обработка создания тикета поддержки"""
     try:
@@ -3793,7 +3728,7 @@ def reset_user_command(message):
     db.log_admin_action(user.id, "reset", target_id, reset_type)
     bot.send_message(message.chat.id, response)
 
-@bot.message_handler(commands=['send_news', 'Отправить новость', 'новость'])
+@bot.message_handler(commands=['news', 'новость'])
 @private_chat_only
 def send_news_command(message):
     user = message.from_user
@@ -3801,18 +3736,41 @@ def send_news_command(message):
         bot.send_message(message.chat.id, "❌ Недостаточно прав!")
         return
     
-    parts = message.text.split(maxsplit=2)
-    if len(parts) < 3:
-        bot.send_message(message.chat.id, "❌ Формат: /news заголовок текст")
+    # Получаем текст после команды
+    if not message.text or len(message.text.split()) < 3:
+        bot.send_message(
+            message.chat.id,
+            "❌ *Формат:* /новость заголовок текст\n\n"
+            "📋 *Пример:*\n"
+            "/новость Важное обновление Добавлены новые виды рыб!\n\n"
+            "⚠️ *Заголовок:* одно слово\n"
+            "📝 *Текст:* всё остальное",
+            parse_mode='Markdown'
+        )
         return
     
+    parts = message.text.split(maxsplit=2)  # Разделяем на 3 части
     title = parts[1]
-    content = parts[2]
+    content = parts[2] if len(parts) > 2 else ""
+    
+    if not content:
+        bot.send_message(message.chat.id, "❌ Текст новости не может быть пустым!")
+        return
     
     # Добавляем новость
     news_item = db.add_news(title, content, user.id)
     
-    # Отправляем всем пользователям
+    # Отправляем подтверждение
+    bot.send_message(
+        message.chat.id,
+        f"✅ *Новость создана!*\n\n"
+        f"📰 Заголовок: {title}\n"
+        f"📝 Текст: {content[:100]}...\n\n"
+        f"⏳ Начинаю рассылку...",
+        parse_mode='Markdown'
+    )
+    
+    # Рассылка всем пользователям
     sent_count = 0
     error_count = 0
     
@@ -3821,22 +3779,26 @@ def send_news_command(message):
             news_text = (
                 f"📰 *НОВОСТЬ: {title}*\n\n"
                 f"{content}\n\n"
-                f"⏰ {datetime.fromisoformat(news_item['timestamp']).strftime('%d.%m.%Y %H:%M')}"
+                f"🎣 Удачи на рыбалке!\n"
+                f"#новость"
             )
-            bot.send_message(user_id, news_text)
+            bot.send_message(int(user_id), news_text, parse_mode='Markdown')
             sent_count += 1
-            time.sleep(0.05)  # Задержка чтобы не превысить лимиты
-        except:
+            time.sleep(0.05)  # Задержка для избежания лимитов
+        except Exception as e:
+            print(f"❌ Не удалось отправить новость пользователю {user_id}: {e}")
             error_count += 1
     
-    response = (
-        f"✅ Новость отправлена!\n\n"
-        f"📝 Заголовок: {title}\n"
-        f"📊 Отправлено: {sent_count} пользователям\n"
-        f"❌ Ошибок: {error_count}"
+    # Отчет
+    bot.send_message(
+        message.chat.id,
+        f"📊 *Рассылка завершена!*\n\n"
+        f"✅ Отправлено: {sent_count} пользователям\n"
+        f"❌ Ошибок: {error_count}\n"
+        f"👥 Всего пользователей: {len(db.users)}"
     )
     
-    bot.send_message(message.chat.id, response)
+    db.log_admin_action(user.id, "send_news", details=f"'{title}'")
 
 @bot.message_handler(commands=['news', 'новости'])
 @private_chat_only
@@ -4493,6 +4455,57 @@ def admin_all_logs_handler(message):
                     "Пример:\n"
                     "/логи actions",
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
+
+# ========== ОСНОВНОЙ ОБРАБОТЧИК ТЕКСТОВЫХ СООБЩЕНИЙ ==========
+@bot.message_handler(func=lambda message: True, content_types=['text'])
+def handle_all_text_messages(message):
+    """Обрабатывает все текстовые сообщения"""
+    
+    # Пропускаем команды (они обработались ранее)
+    if message.text and message.text.startswith('/'):
+        return
+    
+    user = message.from_user
+    user_id = str(user.id)
+    
+    # В группах только проверяем ссылки
+    if message.chat.type in ['group', 'supergroup']:
+        delete_links_in_group(message)
+        return
+    
+    # В личных сообщениях
+    if message.chat.type == 'private':
+        # Если пользователь не зарегистрирован
+        if user_id not in db.users:
+            global NEW_USERS
+            if user_id not in NEW_USERS or (time.time() - NEW_USERS.get(user_id, 0)) > 30:
+                NEW_USERS[user_id] = time.time()
+                show_start_required_message(message)
+            return
+        
+        # Если забанен
+        if db.is_banned(user_id):
+            return
+        
+        # Проверяем, это кнопка меню или произвольный текст
+        main_menu_buttons = [
+            '🎣 Начать рыбалку', '🌊 Сменить водоем', '📊 Статистика',
+            '🎒 Инвентарь', '🛒 Магазин', '💰 Продать рыбу',
+            '🎣 Выбрать приманку', '⚙️ Настройки', '📜 Задания',
+            '🏆 Топ игроков', '📰 Новости', '💰 Донат',
+            '❓ Помощь', '👑 Админ панель', '📋 Меню',
+            '🎣 Забросить удочку'
+        ]
+        
+        # Если это не кнопка меню - показываем меню
+        if message.text not in main_menu_buttons:
+            bot.send_message(
+                message.chat.id,
+                "🎮 *Используйте кнопки меню для игры!*\n\n"
+                "Если кнопки пропали, нажмите /start",
+                reply_markup=create_main_keyboard(user_id),
+                parse_mode='Markdown'
+            )
     
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
@@ -4557,6 +4570,32 @@ def callback_handler(call):
             reply_markup=markup,
             parse_mode='Markdown'
         )
+        return
+    
+    # ДОБАВЬТЕ ЭТОТ ОБРАБОТЧИК:
+    elif call.data == 'support_new':
+        bot.answer_callback_query(call.id, "📝 Введите ваше сообщение...")
+        
+        # Удаляем старое сообщение
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except:
+            pass
+        
+        # Просим ввести сообщение
+        msg = bot.send_message(
+            call.message.chat.id,
+            "🆘 *Обращение в техподдержку*\n\n"
+            "📝 Опишите вашу проблему или вопрос:\n"
+            "• Максимум 500 символов\n"
+            "• Будьте конкретны\n"
+            "• Укажите номер транзакции, если вопрос о донате\n\n"
+            "✏️ *Введите ваше сообщение:*",
+            parse_mode='Markdown'
+        )
+        
+        # Регистрируем следующий шаг
+        bot.register_next_step_handler(msg, process_support_ticket, user.id)
         return
     
     # ========== ОБРАБОТКА КНОПОК НАСТРОЕК ==========
