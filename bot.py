@@ -252,7 +252,7 @@ FISHES = [
     {"name": "Морская звезда", "rarity": "мусор", "weight_range": (0.1, 0.5), "emoji": "⭐", "price": 2, "baits": [], "locations": ["Все моря"]},
     {"name": "Коралл", "rarity": "мусор", "weight_range": (0.5, 3), "emoji": "🪸", "price": 3, "baits": [], "locations": ["Тропические моря"]},
     {"name": "Жемчуг", "rarity": "легендарная", "weight_range": (0.01, 0.05), "emoji": "💎", "price": 2000, "baits": [], "locations": ["Дальневосточные моря"]},
-    {"name": "Золотой самородок", "rarity": "легендарная", "weight_range": (0.1, 5), "emoji": "🥇", "price": 1800, "baits": [], "locations": ["Все водоемы"]},
+    {"name": "Золотой самородок", "rarity": "легендарная", "weight_range": (0.1, 5), "emoji": "🥇", "price": 4800, "baits": [], "locations": ["Все водоемы"]},
     {"name": "Сундук с сокровищами", "rarity": "легендарная", "weight_range": (10, 50), "emoji": "🧰", "price": 1000, "baits": [], "locations": ["Все моря"]}
 ]
 
@@ -5878,6 +5878,17 @@ def handle_media_messages(message):
 # Создаем Flask приложение
 app = Flask(__name__)
 
+def get_user_count():
+    try:
+        if hasattr(db, 'get_all_users_count'):
+            return db.get_all_users_count()
+        elif hasattr(db, 'users'):
+            return len(db.users)
+        else:
+            return "N/A"
+    except:
+        return "N/A"
+
 @app.route('/')
 def home():
     """Главная страница для проверки работы"""
@@ -5965,7 +5976,7 @@ def home():
             <div class="stats">
                 <div class="stat-card">
                     <div>👥 Пользователей</div>
-                    <div class="stat-value">""" + str(len(db.users)) + """</div>
+                    <div class="stat-value">""" + str(get_user_count()) + """</div>
                 </div>
                 <div class="stat-card">
                     <div>🎣 Рыбы</div>
