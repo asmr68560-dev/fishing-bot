@@ -1477,29 +1477,64 @@ def show_start_required_message(message):
     )
 
 # Глобальный обработчик всех сообщений
+# Глобальный обработчик всех НЕ-КОМАНДНЫХ сообщений
 @bot.message_handler(func=lambda message: True, content_types=['text'])
 def global_message_handler(message):
-    """Проверяет все сообщения на регистрацию"""
+    """Обрабатывает только обычные текстовые сообщения (не команды и не кнопки)"""
     user = message.from_user
     user_id = str(user.id)
     
-    # Если это команда
+    # Пропускаем если это команда (начинается с /)
     if message.text and message.text.startswith('/'):
-        # Команды /start и /help доступны без регистрации
-        if message.text.startswith('/start') or message.text.startswith('/help'):
-            return
-        # Для других команд проверяем регистрацию
-        elif not check_registration(message, allow_anonymous=False):
-            return
         return
     
-    # Для обычных сообщений тоже проверяем регистрацию
+    # Пропускаем если это текст кнопки из главного меню
+    main_menu_buttons = [
+        '🎣 Начать рыбалку', '🌊 Сменить водоем', '📊 Статистика',
+        '🎒 Инвентарь', '🛒 Магазин', '💰 Продать рыбу',
+        '🎣 Выбрать приманку', '⚙️ Настройки', '📜 Задания',
+        '🏆 Топ игроков', '📰 Новости', '💰 Донат',
+        '❓ Помощь', '👑 Админ панель', '📋 Меню',
+        '🎣 Забросить удочку'
+    ]
+    
+    if message.text in main_menu_buttons:
+        return  # Это обрабатывается другими хендлерами
+    
+    # Пропускаем если это админская кнопка
+    admin_buttons = [
+        '🚫 Бан/Разбан', '🔇 Мут/Размут', '⚠️ Предупреждение',
+        '💰 Выдать донат', '📜 Логи банов', '📋 Список админов',
+        '👤 Поиск игрока', '🎣 Выдать предметы', '💰 Выдать монеты',
+        '🌟 Выдать опыт', '📊 Статистика бота', '👤 Полная стата',
+        '🔄 Сброс игрока', '⚙️ Полное управление', '🗑️ Очистить логи',
+        '📢 Отправить новость', '📜 Все логи'
+    ]
+    
+    if message.text in admin_buttons:
+        return
+    
+    # ТОЛЬКО теперь проверяем регистрацию для обычных сообщений
     if not check_registration(message, allow_anonymous=False):
         return
     
-    # Проверка ссылок в группах (если сообщение в группе)
+    # Проверка ссылок в группах
     if message.chat.type in ['group', 'supergroup']:
         delete_links_in_group(message)
+        return
+    
+    # Если это личное сообщение и пользователь зарегистрирован
+    if message.chat.type == 'private':
+        # Можно показать подсказку
+        help_text = (
+            f"👋 {user.first_name}, я не понимаю это сообщение!\n\n"
+            f"📋 *Используйте:*\n"
+            f"• Кнопки меню ниже\n"
+            f"• Команды (начинаются с /)\n"
+            f"• /help - для списка команд"
+        )
+        bot.send_message(message.chat.id, help_text, 
+                        reply_markup=create_main_keyboard(user.id))
 
 # ========== ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ДЛЯ ПРОВЕРКИ ПЕРВОГО ВХОДА ==========
 def global_message_handler(message):
@@ -1922,13 +1957,22 @@ def start_command(message):
     user = message.from_user
     user_id = str(user.id)
     
+    print(f"🔔 Команда /start от {user_id} ({user.first_name})")
+    
     # Удаляем из списка ожидания регистрации
     global NEW_USERS
     if user_id in NEW_USERS:
         del NEW_USERS[user_id]
+        print(f"🗑️ Удален из NEW_USERS: {user_id}")
     
     # Получаем или создаем пользователя
-    user_data = db.get_user(user.id)
+    try:
+        user_data = db.get_user(user.id)
+        print(f"✅ Пользователь получен из базы")
+    except Exception as e:
+        print(f"❌ Ошибка получения пользователя: {e}")
+        bot.send_message(message.chat.id, "❌ Ошибка загрузки профиля. Попробуйте снова.")
+        return
     
     # Обновляем информацию
     if user.username:
@@ -1939,46 +1983,59 @@ def start_command(message):
     if 'top_nickname' not in user_data:
         user_data['top_nickname'] = user.first_name
     
-    # Отмечаем время регистрации для новых пользователей
+    # Отмечаем время регистрации
     if 'registered_at' not in user_data:
         user_data['registered_at'] = datetime.now().isoformat()
-        print(f"👤 Новый пользователь: {user_id} ({user.first_name})")
+        user_data['is_new'] = True
+        print(f"👤 Новый пользователь зарегистрирован: {user_id}")
+    
+    # ГАРАНТИРУЕМ, что пользователь в базе
+    if user_id not in db.users:
+        db.users[user_id] = user_data
+        print(f"⚠️ Пользователь добавлен в db.users: {user_id}")
     
     # Сохраняем
-    db.save_data()
+    try:
+        db.save_data()
+        print(f"💾 Данные сохранены для {user_id}")
+    except Exception as e:
+        print(f"❌ Ошибка сохранения: {e}")
     
     # Проверяем бан
     if db.is_banned(user_id):
         ban_time_left = db.get_ban_time_left(user.id)
-        days_left = int(ban_time_left // 86400)
-        hours_left = int((ban_time_left % 86400) // 3600)
-        minutes_left = int((ban_time_left % 3600) // 60)
-        
-        ban_text = (
-            f"🚫 {user.first_name}, ты забанен!\n\n"
-            f"⏳ Бан истечет через: {days_left}д {hours_left}ч {minutes_left}мин\n"
-            f"Ожидайте окончания бана для продолжения игры."
-        )
-        bot.send_message(message.chat.id, ban_text)
+        if ban_time_left > 0:
+            days_left = int(ban_time_left // 86400)
+            hours_left = int((ban_time_left % 86400) // 3600)
+            minutes_left = int((ban_time_left % 3600) // 60)
+            
+            ban_text = (
+                f"🚫 {user.first_name}, ты забанен!\n\n"
+                f"⏳ Бан истечет через: {days_left}д {hours_left}ч {minutes_left}мин\n"
+                f"Ожидайте окончания бана для продолжения игры."
+            )
+            bot.send_message(message.chat.id, ban_text)
         return
     
     # Приветственное сообщение
     welcome_text = (
         f"🎉 *Добро пожаловать, {user.first_name}!*\n\n"
-        f"✅ *Профиль создан/обновлен*\n"
+        f"✅ *Профиль {"создан" if user_data.get('is_new') else "обновлен"}*\n"
         f"🆔 ID: `{user_id}`\n"
         f"💰 Баланс: {user_data['coins']} {COINS_NAME}\n"
         f"🐛 Червяков: {user_data['worms']}/10\n\n"
         f"⚙️ *Ваш ник для топа:* {user_data['top_nickname']}\n"
         f"✏️ Изменить: /настройки\n\n"
-        f"🎮 *Начните играть!*"
+        f"🎮 *Используйте кнопки ниже для игры!*"
     )
     
-    bot.send_message(message.chat.id, welcome_text, 
-                    reply_markup=create_main_keyboard(user.id),
-                    parse_mode='Markdown')
-    
-    bot.send_message(message.chat.id, welcome_text, reply_markup=create_main_keyboard(user.id))
+    try:
+        bot.send_message(message.chat.id, welcome_text, 
+                        reply_markup=create_main_keyboard(user.id),
+                        parse_mode='Markdown')
+        print(f"📨 Приветствие отправлено {user_id}")
+    except Exception as e:
+        print(f"❌ Ошибка отправки сообщения: {e}")
 
 @bot.message_handler(commands=['help'])
 def help_command(message):
@@ -4391,15 +4448,29 @@ def admin_all_logs_handler(message):
 def callback_handler(call):
     user = call.from_user
     
-    # ========== ОБРАБОТКА КНОПОК ДЛЯ НОВЫХ ПОЛЬЗОВАТЕЛЕЙ ==========
+    # ========== КНОПКИ ДЛЯ НОВЫХ ПОЛЬЗОВАТЕЛЕЙ ==========
     if call.data == 'first_time_start_command':
-        # Отправляем команду /start
-        start_command(call.message)
-        bot.answer_callback_query(call.id, "✅ Регистрация начата!")
+        # Удаляем из списка ожидания
+        global NEW_USERS
+        user_id = str(user.id)
+        if user_id in NEW_USERS:
+            del NEW_USERS[user_id]
+        
+        # Отвечаем на callback сразу
+        bot.answer_callback_query(call.id, "⏳ Создаю профиль...")
+        
+        # Удаляем старое сообщение
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except:
+            pass
+        
+        # ПРОСТО ВЫЗЫВАЕМ КОМАНДУ /start через bot.send_message
+        # Это гарантирует, что start_command сработает правильно
+        bot.send_message(call.message.chat.id, "/start")
         return
     
     elif call.data == 'first_time_help':
-        # Показываем информацию об игре
         help_info = (
             f"🎣 *ИГРА \"РЫБАЛКА\"*\n\n"
             f"📍 *Что это?*\n"
