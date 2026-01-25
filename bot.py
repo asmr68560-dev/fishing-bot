@@ -4461,55 +4461,6 @@ def admin_all_logs_handler(message):
                     reply_markup=create_admin_keyboard(get_admin_level(user.id)))
 
 # ========== ОСНОВНОЙ ОБРАБОТЧИК ТЕКСТОВЫХ СООБЩЕНИЙ ==========
-@bot.message_handler(func=lambda message: True, content_types=['text'])
-def handle_all_text_messages(message):
-    """Обрабатывает все текстовые сообщения"""
-    
-    # Пропускаем команды (они обработались ранее)
-    if message.text and message.text.startswith('/'):
-        return
-    
-    user = message.from_user
-    user_id = str(user.id)
-    
-    # В группах только проверяем ссылки
-    if message.chat.type in ['group', 'supergroup']:
-        delete_links_in_group(message)
-        return
-    
-    # В личных сообщениях
-    if message.chat.type == 'private':
-        # Если пользователь не зарегистрирован
-        if user_id not in db.users:
-            global NEW_USERS
-            if user_id not in NEW_USERS or (time.time() - NEW_USERS.get(user_id, 0)) > 30:
-                NEW_USERS[user_id] = time.time()
-                show_start_required_message(message)
-            return
-        
-        # Если забанен
-        if db.is_banned(user_id):
-            return
-        
-        # Проверяем, это кнопка меню или произвольный текст
-        main_menu_buttons = [
-            '🎣 Начать рыбалку', '🌊 Сменить водоем', '📊 Статистика',
-            '🎒 Инвентарь', '🛒 Магазин', '💰 Продать рыбу',
-            '🎣 Выбрать приманку', '⚙️ Настройки', '📜 Задания',
-            '🏆 Топ игроков', '📰 Новости', '💰 Донат',
-            '❓ Помощь', '👑 Админ панель', '📋 Меню',
-            '🎣 Забросить удочку'
-        ]
-        
-        # Если это не кнопка меню - показываем меню
-        if message.text not in main_menu_buttons:
-            bot.send_message(
-                message.chat.id,
-                "🎮 *Используйте кнопки меню для игры!*\n\n"
-                "Если кнопки пропали, нажмите /start",
-                reply_markup=create_main_keyboard(user_id),
-                parse_mode='Markdown'
-            )
     
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
