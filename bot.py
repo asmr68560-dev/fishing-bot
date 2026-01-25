@@ -1870,39 +1870,78 @@ def delete_links_in_group(message):
     return False
 
 # ========== ДЕКОРАТОРЫ ==========
-
 def private_chat_only(func):
     """
     Декоратор для команд, которые работают ТОЛЬКО в личных сообщениях
-    
-    Использование:
-    @bot.message_handler(commands=['start'])
-    @private_chat_only
-    def start_command(message):
-        # ... код команды ...
+    Возвращает оригинальную функцию если чат приватный, иначе ничего не делает
     """
     def wrapper(message, *args, **kwargs):
-        # Проверяем тип чата
+        # Если это НЕ приватный чат
         if message.chat.type != 'private':
-            # Если это группа или супергруппа
-            if message.chat.type in ['group', 'supergroup']:
-                # Отправляем сообщение только если это команда (начинается с /)
-                if message.text and message.text.startswith('/'):
-                    reply_text = (
-                        "🤖 *Эта команда работает только в личных сообщениях!*\n\n"
-                        "🎣 Для игры в рыбалку напишите мне в личные сообщения:\n"
-                        "1. Найдите меня в поиске\n"
-                        "2. Нажмите 'Написать сообщение'\n"
-                        "3. Используйте команду /start\n\n"
-                        "⚡ В группах я только проверяю ссылки!"
-                    )
-                    bot.send_message(message.chat.id, reply_text, parse_mode='Markdown')
-            return  # Прерываем выполнение команды в группах
+            # Если это команда (начинается с /) - показываем сообщение
+            if message.text and message.text.startswith('/'):
+                reply_text = (
+                    "🤖 *Эта команда работает только в личных сообщениях!*\n\n"
+                    "🎣 Для игры в рыбалку:\n"
+                    "1. Найдите @Pikefishing8_bot в поиске\n"
+                    "2. Нажмите 'Написать сообщение'\n"
+                    "3. Используйте команду /start\n\n"
+                    "⚡ В группах я только проверяю ссылки!"
+                )
+                bot.send_message(message.chat.id, reply_text, parse_mode='Markdown')
+            # ВОЗВРАЩАЕМ None чтобы прервать выполнение команды
+            return None
         
-        # Если это личное сообщение - выполняем оригинальную функцию
+        # Если это приватный чат - выполняем оригинальную функцию
         return func(message, *args, **kwargs)
     
     return wrapper
+
+def button_handler_decorator(func):
+    """
+    Декоратор для обработчиков кнопок
+    Проверяет приватный чат и регистрацию
+    """
+    def wrapper(message, *args, **kwargs):
+        # 1. Проверяем что это приватный чат
+        if message.chat.type != 'private':
+            return None
+        
+        # 2. Проверяем регистрацию
+        user_id = str(message.from_user.id)
+        if user_id not in db.users:
+            global NEW_USERS
+            if user_id not in NEW_USERS or (time.time() - NEW_USERS.get(user_id, 0)) > 30:
+                NEW_USERS[user_id] = time.time()
+                show_start_required_message(message)
+            return None
+        
+        # 3. Проверяем бан
+        if hasattr(db, 'is_banned') and db.is_banned(user_id):
+            return None
+        
+        # 4. Выполняем оригинальную функцию
+        return func(message, *args, **kwargs)
+    
+    return wrapper
+
+def admin_only(min_level=1):
+    """Декоратор для админских функций"""
+    def decorator(func):
+        def wrapper(message, *args, **kwargs):
+            # Проверяем приватный чат
+            if message.chat.type != 'private':
+                return None
+            
+            # Проверяем права админа
+            if not is_admin(message.from_user.id, min_level):
+                bot.send_message(message.chat.id, "❌ Недостаточно прав!")
+                return None
+            
+            # Выполняем функцию
+            return func(message, *args, **kwargs)
+        return wrapper
+    return decorator
 
 # ========== ОСНОВНЫЕ КОМАНДЫ ==========
 @bot.message_handler(commands=['start'])
@@ -4083,78 +4122,79 @@ def show_ticket_command(message):
 
 # ========== ОБРАБОТЧИКИ КНОПОК ==========
 @bot.message_handler(func=lambda msg: msg.text == '🎣 Начать рыбалку')
-@private_chat_only
+@button_handler_decorator
 def fishing_button_handler(message):
     fishing_command_handler(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '🌊 Сменить водоем')
-@private_chat_only
+@button_handler_decorator
 def location_button_handler(message):
     location_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '🎣 Забросить удочку')
-@private_chat_only
+@button_handler_decorator
 def fishing_cast_handler(message):
     fishing_command_handler(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '📊 Статистика')
-@private_chat_only
+@button_handler_decorator
 def stats_button_handler(message):
     stats_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '🎒 Инвентарь')
-@private_chat_only
+@button_handler_decorator
 def inventory_button_handler(message):
     inventory_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '🛒 Магазин')
-@private_chat_only
+@button_handler_decorator
 def shop_button_handler(message):
     shop_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '💰 Продать рыбу')
-@private_chat_only
+@button_handler_decorator
 def sell_button_handler(message):
     sell_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '📜 Задания')
-@private_chat_only
+@button_handler_decorator
 def quests_button_handler(message):
     quests_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '🏆 Топ игроков')
-@private_chat_only
+@button_handler_decorator
 def top_button_handler(message):
     top_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '📰 Новости')
-@private_chat_only
+@button_handler_decorator
 def news_button_handler(message):
     public_news_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '💰 Донат')
-@private_chat_only
+@button_handler_decorator
 def donate_button_handler(message):
     donate_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '❓ Помощь')
-@private_chat_only
+@button_handler_decorator
 def help_button_handler(message):
     help_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '🎣 Выбрать приманку')
-@private_chat_only
+@button_handler_decorator
 def select_bait_button(message):
     select_bait_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '⚙️ Настройки')
-@private_chat_only
+@button_handler_decorator
 def settings_button_handler(message):
     """Обработка кнопки настроек"""
     settings_command(message)
 
 @bot.message_handler(func=lambda msg: msg.text == '👑 Админ панель')
-@private_chat_only
+@button_handler_decorator
+@admin_only(min_level=1)
 def admin_panel_handler(message):
     user = message.from_user
     if not is_admin(user.id, 1):
