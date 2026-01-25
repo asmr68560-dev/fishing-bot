@@ -1369,7 +1369,11 @@ class UserDatabase:
             print(f"❌ Ошибка создания бэкапа: {e}")
             return None
 
-db = UserDatabase()
+from database_manager import db_manager as db
+from database_models import init_db
+
+init_db()
+print("PostgreSQL база данных инциализирована")
 
 # ========== СИСТЕМА ПРОВЕРКИ РЕГИСТРАЦИИ ==========
 
