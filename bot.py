@@ -51,6 +51,10 @@ ADMIN_LOG_FILE = 'admin_logs.json'
 ACTION_LOG_FILE = 'action_logs.json'
 NEWS_CHANNEL_ID = None  # ID канала для новостей (можно установить позже)
 
+# БАЗА ДАННЫХ
+db = UserDatabase
+print(f"База данных создана, пользователей: {len(db.users)}")
+
 # ========== ВОДОЕМЫ (10 реальных водоемов России) ==========
 WATER_BODIES = [
     {
@@ -1369,12 +1373,6 @@ class UserDatabase:
             print(f"❌ Ошибка создания бэкапа: {e}")
             return None
 
-from database_manager import db_manager as db
-from database_models import init_db
-
-init_db()
-print("PostgreSQL база данных инциализирована")
-
 # ========== СИСТЕМА ПРОВЕРКИ РЕГИСТРАЦИИ ==========
 
 # Глобальная переменная для новых пользователей
@@ -1958,34 +1956,68 @@ def start_command(message):
         del NEW_USERS[user_id]
         print(f"🗑️ Удален из NEW_USERS: {user_id}")
     
-    # Получаем или создаем пользователя
     try:
-        user_data = db.get_user(user.id)
-        print(f"✅ Пользователь получен из базы")
+        # ВАЖНО: Используем существующую базу данных
+        if user_id in db.users:
+            user_data = db.users[user_id]
+            print(f"✅ Пользователь уже существует в базе")
+        else:
+            # Создаем нового пользователя
+            user_data = {
+                'id': user_id,
+                'worms': INITIAL_WORMS,
+                'fish_caught': [],
+                'total_fish': 0,
+                'last_fishing_time': None,
+                'last_worm_refill': time.time(),
+                'stats': {'common': 0, 'rare': 0, 'epic': 0, 'legendary': 0, 'trash': 0},
+                'username': user.username,
+                'first_name': user.first_name,
+                'warnings': [],
+                'banned_until': None,
+                'muted_until': None,
+                'coins': INITIAL_COINS,
+                'inventory': {
+                    'rods': [{"name": "🎣 Маховая удочка", "equipped": True, "durability": 100, "max_durability": 100, "upgrades": [], "unbreakable": False}],
+                    'baits': [{"name": "🌱 Обычный червь", "count": 10}],
+                    'fish': {}
+                },
+                'daily_quests': {},
+                'quests_completed_today': 0,
+                'last_daily_reset': datetime.now().isoformat(),
+                'current_rod': "🎣 Маховая удочка",
+                'current_bait': "🌱 Обычный червь",
+                'current_location': random.choice(WATER_BODIES)['name'],
+                'favorite_fishing_spots': [],
+                'achievements': [],
+                'fishing_level': 1,
+                'experience': 0,
+                'total_coins_earned': 0,
+                'donate_history': [],
+                'rod_upgrades': {},
+                'luck_bonus': 0.0,
+                'unbreakable_rods': False,
+                'top_nickname': user.first_name,
+                'hide_from_top': False,
+                'show_stats': True,
+                'notifications': True,
+                'registered_at': datetime.now().isoformat(),
+                'is_new': True
+            }
+            db.users[user_id] = user_data
+            print(f"✅ Создан новый пользователь: {user_id}")
     except Exception as e:
         print(f"❌ Ошибка получения пользователя: {e}")
         bot.send_message(message.chat.id, "❌ Ошибка загрузки профиля. Попробуйте снова.")
         return
     
     # Обновляем информацию
-    if user.username:
-        user_data['username'] = user.username
+    user_data['username'] = user.username
     user_data['first_name'] = user.first_name
     
-    # Устанавливаем ник для топа
-    if 'top_nickname' not in user_data:
+    # Устанавливаем ник для топа если не установлен
+    if 'top_nickname' not in user_data or not user_data['top_nickname']:
         user_data['top_nickname'] = user.first_name
-    
-    # Отмечаем время регистрации
-    if 'registered_at' not in user_data:
-        user_data['registered_at'] = datetime.now().isoformat()
-        user_data['is_new'] = True
-        print(f"👤 Новый пользователь зарегистрирован: {user_id}")
-    
-    # ГАРАНТИРУЕМ, что пользователь в базе
-    if user_id not in db.users:
-        db.users[user_id] = user_data
-        print(f"⚠️ Пользователь добавлен в db.users: {user_id}")
     
     # Сохраняем
     try:
@@ -1995,9 +2027,10 @@ def start_command(message):
         print(f"❌ Ошибка сохранения: {e}")
     
     # Проверяем бан
-    if db.is_banned(user_id):
-        ban_time_left = db.get_ban_time_left(user.id)
-        if ban_time_left > 0:
+    if 'banned_until' in user_data and user_data['banned_until']:
+        current_time = time.time()
+        if current_time < user_data['banned_until']:
+            ban_time_left = user_data['banned_until'] - current_time
             days_left = int(ban_time_left // 86400)
             hours_left = int((ban_time_left % 86400) // 3600)
             minutes_left = int((ban_time_left % 3600) // 60)
@@ -2008,12 +2041,13 @@ def start_command(message):
                 f"Ожидайте окончания бана для продолжения игры."
             )
             bot.send_message(message.chat.id, ban_text)
-        return
+            return
     
     # Приветственное сообщение
+    is_new = user_data.get('is_new', False)
     welcome_text = (
-        f"🎉 *Добро пожаловать, {user.first_name}!*\n\n"
-        f"✅ *Профиль {"создан" if user_data.get('is_new') else "обновлен"}*\n"
+        f"🎉 *{'Добро пожаловать' if is_new else 'С возвращением'}, {user.first_name}!*\n\n"
+        f"✅ *Профиль {"создан" if is_new else "обновлен"}*\n"
         f"🆔 ID: `{user_id}`\n"
         f"💰 Баланс: {user_data['coins']} {COINS_NAME}\n"
         f"🐛 Червяков: {user_data['worms']}/10\n\n"
@@ -5630,9 +5664,558 @@ def callback_handler(call):
         bot.register_next_step_handler(msg, handle_support_message)
         bot.answer_callback_query(call.id, "Напишите ваш вопрос")
 
+    elif call.data == 'settings_toggle_hide':
+        # Переключаем скрытие из топа
+        user_data = db.get_user(user.id)
+        current_hide = user_data.get('hide_from_top', False)
+        user_data['hide_from_top'] = not current_hide
+        db.save_data()
+    
+        status = "скрыт 👻" if not current_hide else "виден 👁️"
+        bot.answer_callback_query(call.id, f"✅ Вы теперь {status} в топе")
+    
+        # Обновляем сообщение
+        nickname = user_data.get('top_nickname', user.first_name)
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        btn_nickname = types.InlineKeyboardButton(f'📝 Ник: {nickname[:10]}...', callback_data='settings_change_nickname')
+        btn_hide = types.InlineKeyboardButton(f'👁️ {"✅ Скрыт" if not current_hide else "❌ Виден"} в топе', callback_data='settings_toggle_hide')
+        btn_reset = types.InlineKeyboardButton('🔄 Сбросить ник', callback_data='settings_reset_nickname')
+        btn_back = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+        markup.add(btn_nickname, btn_hide, btn_reset, btn_back)
+    
+        bot.edit_message_text(
+            f"⚙️ *Настройки профиля*\n\n"
+            f"👤 Ваш ник в топе: *{nickname}*\n"
+            f"👁️ Статус в топе: {'*Скрыт* 👻' if not current_hide else '*Виден* 👁️'}\n\n"
+            f"✅ Настройки обновлены!",
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=markup
+        )
+
+# ========== ОБРАБОТЧИКИ МАГАЗИНА ==========
+    elif call.data.startswith('shop_'):
+        if call.data == 'shop_baits':
+            # Показать приманки
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            for bait in BAITS[:15]:  # Показываем первые 15 приманок
+                btn = types.InlineKeyboardButton(
+                    f"{bait['name']} - {bait['price']}р",
+                    callback_data=f'buy_bait_{bait["name"].replace(" ", "_")}'
+                )
+                markup.add(btn)
+        
+            btn_back = types.InlineKeyboardButton('🔙 Назад в магазин', callback_data='shop_back')
+            markup.add(btn_back)
+        
+            user_data = db.get_user(user.id)
+            text = f"🪱 *Магазин приманок*\n\n💰 Ваш баланс: {user_data['coins']} {COINS_NAME}\n\nВыберите приманку для покупки:"
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    
+    elif call.data == 'shop_rods':
+        # Показать удочки
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        for rod in RODS[:10]:  # Показываем первые 10 удочек
+            btn = types.InlineKeyboardButton(
+                f"{rod['name']} - {rod['price']}р",
+                callback_data=f'buy_rod_{rod["name"].replace(" ", "_")}'
+            )
+            markup.add(btn)
+        
+        btn_back = types.InlineKeyboardButton('🔙 Назад в магазин', callback_data='shop_back')
+        markup.add(btn_back)
+        
+        user_data = db.get_user(user.id)
+        text = f"🎣 *Магазин удочек*\n\n💰 Ваш баланс: {user_data['coins']} {COINS_NAME}\n\nВыберите удочку для покупки:"
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    
+    elif call.data == 'shop_upgrades':
+        # Показать улучшения
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        for upgrade in ROD_UPGRADES:
+            btn = types.InlineKeyboardButton(
+                f"{upgrade['name']} - {upgrade['price']}р",
+                callback_data=f'buy_upgrade_{upgrade["effect"]}'
+            )
+            markup.add(btn)
+        
+        btn_back = types.InlineKeyboardButton('🔙 Назад в магазин', callback_data='shop_back')
+        markup.add(btn_back)
+        
+        user_data = db.get_user(user.id)
+        text = f"⚙️ *Магазин улучшений*\n\n💰 Ваш баланс: {user_data['coins']} {COINS_NAME}\n\nВыберите улучшение:"
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    
+    elif call.data == 'shop_worms':
+        # Покупка червяков
+        markup = types.InlineKeyboardMarkup(row_width=3)
+        btn1 = types.InlineKeyboardButton('10 червяков - 100р', callback_data='buy_worms_10')
+        btn2 = types.InlineKeyboardButton('50 червяков - 400р', callback_data='buy_worms_50')
+        btn3 = types.InlineKeyboardButton('100 червяков - 700р', callback_data='buy_worms_100')
+        btn_back = types.InlineKeyboardButton('🔙 Назад в магазин', callback_data='shop_back')
+        markup.add(btn1, btn2, btn3, btn_back)
+        
+        user_data = db.get_user(user.id)
+        text = f"🐛 *Покупка червяков*\n\n💰 Ваш баланс: {user_data['coins']} {COINS_NAME}\n🐛 Сейчас у вас: {user_data['worms']}/10\n\nВыберите количество:"
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    
+    elif call.data == 'shop_back':
+        # Вернуться в магазин
+        markup = types.InlineKeyboardMarkup(row_width=2)
+        btn1 = types.InlineKeyboardButton('🪱 Приманки', callback_data='shop_baits')
+        btn2 = types.InlineKeyboardButton('🎣 Удочки', callback_data='shop_rods')
+        btn3 = types.InlineKeyboardButton('⚙️ Улучшения', callback_data='shop_upgrades')
+        btn4 = types.InlineKeyboardButton('🐛 Купить червяков', callback_data='shop_worms')
+        btn5 = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+        markup.add(btn1, btn2, btn3, btn4, btn5)
+        
+        user_data = db.get_user(user.id)
+        shop_text = f"🛒 *Магазин рыболовных снастей*\n\n💰 Ваш баланс: {user_data['coins']} {COINS_NAME}\n\nВыберите категорию:"
+        bot.edit_message_text(shop_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+
+# ========== ОБРАБОТЧИКИ ПОКУПКИ ==========
+    elif call.data.startswith('buy_'):
+        if call.data.startswith('buy_bait_'):
+            bait_name = call.data.replace('buy_bait_', '').replace('_', ' ')
+            user_data = db.get_user(user.id)
+        
+            # Находим приманку
+            bait_item = None
+            for bait in BAITS:
+                if bait['name'] == bait_name:
+                    bait_item = bait
+                    break
+        
+            if bait_item and user_data['coins'] >= bait_item['price']:
+                db.remove_coins(user.id, bait_item['price'])
+                db.add_bait(user.id, bait_name, 1)
+            
+                bot.answer_callback_query(call.id, f"✅ Куплено: {bait_name}")
+            
+                # Показываем обновленный магазин приманок
+                markup = types.InlineKeyboardMarkup(row_width=2)
+                for bait in BAITS[:15]:
+                    btn = types.InlineKeyboardButton(
+                        f"{bait['name']} - {bait['price']}р",
+                        callback_data=f'buy_bait_{bait["name"].replace(" ", "_")}'
+                    )
+                    markup.add(btn)
+            
+                btn_back = types.InlineKeyboardButton('🔙 Назад в магазин', callback_data='shop_back')
+                markup.add(btn_back)
+            
+                user_data = db.get_user(user.id)
+                text = f"✅ Куплено: {bait_name}\n💰 Осталось: {user_data['coins']} {COINS_NAME}\n\n🪱 *Магазин приманок*\n\nВыберите приманку:"
+                bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+            else:
+                bot.answer_callback_query(call.id, f"❌ Недостаточно средств или приманка не найдена")
+
+    # ========== ОБРАБОТЧИКИ ТОПА ==========
+    elif call.data.startswith('top_'):
+        if call.data == 'top_coins':
+            top_players = db.get_top_players("coins", 10)
+            text = "🏆 *Топ игроков по рыбоп*\n\n"
+        
+            for i, player in enumerate(top_players):
+                if i < 3:
+                    medal = ["🥇", "🥈", "🥉"][i]
+                else:
+                    medal = f"{i+1}."
+            
+                # Проверяем скрыт ли игрок
+                if player.get('hide_from_top', False):
+                    text += f"{medal} *👻 Скрытый игрок*\n"
+                else:
+                    text += f"{medal} *{player.get('display_name', 'Игрок')}*\n"
+            
+                text += f"   💰 {player.get('score', 0)} рыбоп | 🎣 Ур. {player.get('level', 1)}\n\n"
+        
+            markup = types.InlineKeyboardMarkup(row_width=3)
+            btn1 = types.InlineKeyboardButton('💰 По рыбоп', callback_data='top_coins')
+            btn2 = types.InlineKeyboardButton('🐟 По рыбе', callback_data='top_fish')
+            btn3 = types.InlineKeyboardButton('🎣 По уровню', callback_data='top_level')
+            btn4 = types.InlineKeyboardButton('🌟 По редкостям', callback_data='top_rare')
+            btn5 = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+            markup.add(btn1, btn2, btn3, btn4, btn5)
+        
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
+    
+    elif call.data == 'top_fish':
+        top_players = db.get_top_players("fish", 10)
+        text = "🏆 *Топ игроков по количеству рыбы*\n\n"
+        
+        for i, player in enumerate(top_players):
+            if i < 3:
+                medal = ["🥇", "🥈", "🥉"][i]
+            else:
+                medal = f"{i+1}."
+            
+            if player.get('hide_from_top', False):
+                text += f"{medal} *👻 Скрытый игрок*\n"
+            else:
+                text += f"{medal} *{player.get('display_name', 'Игрок')}*\n"
+            
+            text += f"   🐟 {player.get('score', 0)} рыб | 🎣 Ур. {player.get('level', 1)}\n\n"
+        
+        markup = types.InlineKeyboardMarkup(row_width=3)
+        btn1 = types.InlineKeyboardButton('💰 По рыбоп', callback_data='top_coins')
+        btn2 = types.InlineKeyboardButton('🐟 По рыбе', callback_data='top_fish')
+        btn3 = types.InlineKeyboardButton('🎣 По уровню', callback_data='top_level')
+        btn4 = types.InlineKeyboardButton('🌟 По редкостям', callback_data='top_rare')
+        btn5 = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+        markup.add(btn1, btn2, btn3, btn4, btn5)
+        
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
+    
+    elif call.data == 'top_level':
+        top_players = db.get_top_players("level", 10)
+        text = "🏆 *Топ игроков по уровню*\n\n"
+        
+        for i, player in enumerate(top_players):
+            if i < 3:
+                medal = ["🥇", "🥈", "🥉"][i]
+            else:
+                medal = f"{i+1}."
+            
+            if player.get('hide_from_top', False):
+                text += f"{medal} *👻 Скрытый игрок*\n"
+            else:
+                text += f"{medal} *{player.get('display_name', 'Игрок')}*\n"
+            
+            # Ищем количество рыбы у игрока
+            user_id = player.get('user_id')
+            player_data = db.get_user(user_id) if user_id in db.users else {}
+            total_fish = player_data.get('total_fish', 0)
+            
+            text += f"   🎣 Ур. {player.get('score', 1)} | 🐟 Рыб: {total_fish}\n\n"
+        
+        markup = types.InlineKeyboardMarkup(row_width=3)
+        btn1 = types.InlineKeyboardButton('💰 По рыбоп', callback_data='top_coins')
+        btn2 = types.InlineKeyboardButton('🐟 По рыбе', callback_data='top_fish')
+        btn3 = types.InlineKeyboardButton('🎣 По уровню', callback_data='top_level')
+        btn4 = types.InlineKeyboardButton('🌟 По редкостям', callback_data='top_rare')
+        btn5 = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+        markup.add(btn1, btn2, btn3, btn4, btn5)
+        
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
+    
+    elif call.data == 'top_rare':
+        top_players = db.get_top_players("rare", 10)
+        text = "🏆 *Топ игроков по редкостям*\n\n"
+        
+        for i, player in enumerate(top_players):
+            if i < 3:
+                medal = ["🥇", "🥈", "🥉"][i]
+            else:
+                medal = f"{i+1}."
+            
+            if player.get('hide_from_top', False):
+                text += f"{medal} *👻 Скрытый игрок*\n"
+            else:
+                text += f"{medal} *{player.get('display_name', 'Игрок')}*\n"
+            
+            # Получаем детальную статистику
+            user_id = player.get('user_id')
+            player_data = db.get_user(user_id) if user_id in db.users else {}
+            stats = player_data.get('stats', {})
+            
+            legend = stats.get('legendary', 0)
+            epic = stats.get('epic', 0)
+            rare = stats.get('rare', 0)
+            
+            text += f"   👑 {legend} | 🌟 {epic} | 🐠 {rare}\n\n"
+        
+        markup = types.InlineKeyboardMarkup(row_width=3)
+        btn1 = types.InlineKeyboardButton('💰 По рыбоп', callback_data='top_coins')
+        btn2 = types.InlineKeyboardButton('🐟 По рыбе', callback_data='top_fish')
+        btn3 = types.InlineKeyboardButton('🎣 По уровню', callback_data='top_level')
+        btn4 = types.InlineKeyboardButton('🌟 По редкостям', callback_data='top_rare')
+        btn5 = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+        markup.add(btn1, btn2, btn3, btn4, btn5)
+        
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
+
+    # ========== ДРУГИЕ ОБРАБОТЧИКИ ==========
+    elif call.data == 'menu':
+        bot.answer_callback_query(call.id, "📋 Возвращаю в меню...")
+    
+        # Отправляем новое меню
+        bot.send_message(call.message.chat.id, 
+                        "📋 *Главное меню*\n\nВыберите действие:",
+                        reply_markup=create_main_keyboard(user.id),
+                        parse_mode='Markdown')
+    
+        # Пытаемся удалить старое сообщение
+        try:
+            bot.delete_message(call.message.chat.id, call.message.message_id)
+        except:
+            pass
+
+    elif call.data.startswith('select_location_'):
+        try:
+            location_index = int(call.data.split('_')[2])
+            if 0 <= location_index < len(WATER_BODIES):
+                location = WATER_BODIES[location_index]
+                db.set_current_location(user.id, location['name'])
+            
+                bot.answer_callback_query(call.id, f"✅ Водоем изменен на {location['name']}")
+            
+                text = f"🌊 *Водоем изменен!*\n\n{location['emoji']} *{location['name']}*\n{location['description']}\n📍 Координаты: {location['coordinates']}\n⚡ Сложность: {location['difficulty']}"
+                bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown')
+        except:
+            bot.answer_callback_query(call.id, "❌ Ошибка при выборе водоема")
+
+    elif call.data.startswith('select_bait_'):
+        bait_name = call.data.replace('select_bait_', '')
+        db.set_current_bait(user.id, bait_name)
+    
+        bot.answer_callback_query(call.id, f"✅ Приманка изменена на {bait_name}")
+    
+        text = f"🎣 *Приманка изменена!*\n\nТеперь вы используете: *{bait_name}*"
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown')
+
+    # ========== ОБРАБОТЧИКИ ДОНАТА ==========
+    elif call.data.startswith('donate_'):
+        if call.data == 'donate_upgrades':
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            upgrades = [p for p in DONATE_PACKAGES if p['type'] == 'upgrade']
+            for package in upgrades:
+                btn = types.InlineKeyboardButton(
+                    f"{package['emoji']} {package['name']} - {package['price_rub']}₽",
+                    callback_data=f'donate_info_{package["unique_code"]}'
+                )
+                markup.add(btn)
+        
+            btn_back = types.InlineKeyboardButton('🔙 Назад в донат', callback_data='donate_back')
+            markup.add(btn_back)
+        
+            text = "🛡️ *Улучшения за донат*\n\nВыберите улучшение для покупки:"
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    
+        elif call.data == 'donate_rods':
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            rods = [p for p in DONATE_PACKAGES if p['type'] == 'rod']
+            for package in rods:
+                btn = types.InlineKeyboardButton(
+                    f"{package['emoji']} {package['name']} - {package['price_rub']}₽",
+                    callback_data=f'donate_info_{package["unique_code"]}'
+                )
+                markup.add(btn)
+        
+            btn_back = types.InlineKeyboardButton('🔙 Назад в донат', callback_data='donate_back')
+            markup.add(btn_back)
+        
+            text = "🎣 *Удочки за донат*\n\nВыберите удочку для покупки:"
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    
+        elif call.data == 'donate_coins':
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            coins = [p for p in DONATE_PACKAGES if p['type'] == 'coins']
+            for package in coins:
+                btn = types.InlineKeyboardButton(
+                    f"{package['emoji']} {package['name']} - {package['price_rub']}₽",
+                    callback_data=f'donate_info_{package["unique_code"]}'
+                )
+                markup.add(btn)
+        
+            btn_back = types.InlineKeyboardButton('🔙 Назад в донат', callback_data='donate_back')
+            markup.add(btn_back)
+        
+            text = "💰 *Рыбоп за донат*\n\nВыберите пакет рыбоп:"
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    
+        elif call.data == 'donate_packs':
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            packs = [p for p in DONATE_PACKAGES if p['type'] == 'pack']
+            for package in packs:
+                btn = types.InlineKeyboardButton(
+                    f"{package['emoji']} {package['name']} - {package['price_rub']}₽",
+                    callback_data=f'donate_info_{package["unique_code"]}'
+                )
+                markup.add(btn)
+        
+            btn_back = types.InlineKeyboardButton('🔙 Назад в донат', callback_data='donate_back')
+            markup.add(btn_back)
+        
+            text = "🎁 *Наборы за донат*\n\nВыберите набор:"
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    
+        elif call.data == 'donate_back':
+            # Вернуться в меню доната
+            markup = types.InlineKeyboardMarkup(row_width=2)
+            btn1 = types.InlineKeyboardButton('🛡️ Улучшения', callback_data='donate_upgrades')
+            btn2 = types.InlineKeyboardButton('🎣 Удочки', callback_data='donate_rods')
+            btn3 = types.InlineKeyboardButton('💰 Рыбоп', callback_data='donate_coins')
+            btn4 = types.InlineKeyboardButton('🎁 Наборы', callback_data='donate_packs')
+            btn5 = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+            markup.add(btn1, btn2, btn3, btn4, btn5)
+        
+            donate_text = (
+                f"💰 *Поддержать проект*\n\n"
+                f"💖 Ваша поддержка помогает развивать бота!\n\n"
+                f"📞 *Для связи:* @Belka759\n"
+                f"💳 *Карта для перевода:* 2200702034105283\n\n"
+                f"Выберите категорию:"
+            )
+        
+            bot.edit_message_text(donate_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+
+    elif call.data.startswith('donate_info_'):
+        package_code = call.data.replace('donate_info_', '')
+        package = next((p for p in DONATE_PACKAGES if p['unique_code'] == package_code), None)
+    
+        if package:
+            text = (
+                f"{package['emoji']} *{package['name']}*\n\n"
+                f"💎 Цена: {package['price_rub']}₽\n"
+                f"📝 Описание: {package['description']}\n\n"
+                f"📞 *Как купить:*\n"
+                f"1. Переведите {package['price_rub']}₽ на карту:\n"
+                f"   `2200702034105283`\n"
+                f"2. Пришлите скриншот перевода @Belka759\n"
+                f"3. Укажите код пакета: `{package['unique_code']}`\n"
+                f"4. Администратор выдаст вам покупку!\n\n"
+                f"🆔 Ваш ID для покупки: `{user.id}`"
+            )
+        
+            markup = types.InlineKeyboardMarkup()
+            btn_buy = types.InlineKeyboardButton('🛒 Купить', url='https://t.me/Belka759')
+            btn_back = types.InlineKeyboardButton('🔙 Назад', callback_data='donate_back')
+            markup.add(btn_buy, btn_back)
+        
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup, parse_mode='Markdown')
+
+            # ========== ОБРАБОТЧИКИ ПРОДАЖИ РЫБЫ ==========
+    elif call.data.startswith('sell_npc_'):
+        npc_index = int(call.data.split('_')[2])
+        user_data = db.get_user(user.id)
+    
+        if not user_data['inventory']['fish']:
+            bot.answer_callback_query(call.id, "🎣 У вас нет рыбы для продажи!")
+            return
+    
+        npc = NPC_SELLERS[npc_index % len(NPC_SELLERS)]
+    
+        markup = types.InlineKeyboardMarkup(row_width=2)
+    
+        # Показываем рыбу с ценами
+        for fish_name, count in user_data['inventory']['fish'].items():
+            # Находим базовую цену
+            base_price = 0
+            for fish in FISHES:
+                if fish['name'] == fish_name:
+                    base_price = fish.get('price', 0)
+                    break
+        
+            if base_price > 0:
+                # Вычисляем цену с учетом NPC
+                multiplier = npc['multiplier']
+                if fish_name in npc.get('preferred_fish', []):
+                    multiplier *= 1.5
+            
+                total_price = int(base_price * count * multiplier)
+            
+                btn = types.InlineKeyboardButton(
+                    f"{fish_name} ({count} шт) - {total_price}р",
+                    callback_data=f'sell_fish_{npc_index}_{fish_name.replace(" ", "_")}'
+                )
+                markup.add(btn)
+    
+        btn_back = types.InlineKeyboardButton('🔙 Выбрать NPC', callback_data='sell_back')
+        markup.add(btn_back)
+    
+        text = (
+            f"💰 *Продажа рыбы через {npc['emoji']} {npc['name']}*\n\n"
+            f"📝 {npc['description']}\n"
+            f"📈 Множитель цены: x{npc['multiplier']}\n"
+            f"💖 Любимая рыба: {', '.join(npc.get('preferred_fish', ['вся']))}\n\n"
+            f"Выберите рыбу для продажи:"
+        )
+    
+        bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+
+    elif call.data == 'sell_back':
+        # Вернуться к выбору NPC
+        user_data = db.get_user(user.id)
+    
+        markup = types.InlineKeyboardMarkup(row_width=2)
+    
+        for i, npc in enumerate(NPC_SELLERS):
+            btn = types.InlineKeyboardButton(f"{npc['emoji']} {npc['name']}", callback_data=f'sell_npc_{i}')
+            markup.add(btn)
+    
+        btn_back = types.InlineKeyboardButton('📋 Меню', callback_data='menu')
+        markup.add(btn_back)
+    
+        sell_text = f"💰 *Продажа рыбы*\n\n🐟 Ваша рыба:\n"
+    
+        for fish_name, count in user_data['inventory']['fish'].items():
+            base_price = 0
+            for fish in FISHES:
+                if fish['name'] == fish_name:
+                    base_price = fish.get('price', 0)
+                    break
+        
+            if base_price > 0:
+                sell_text += f"• {fish_name}: {count} шт (по {base_price} {COINS_NAME})\n"
+    
+        sell_text += "\nВыберите покупателя:"
+    
+        bot.edit_message_text(sell_text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+
+    elif call.data.startswith('sell_fish_'):
+        parts = call.data.split('_')
+        npc_index = int(parts[2])
+        fish_name = '_'.join(parts[3:]).replace('_', ' ')
+    
+        # Продаем ВСЮ рыбу этого типа
+        user_data = db.get_user(user.id)
+        count = user_data['inventory']['fish'].get(fish_name, 0)
+    
+        if count > 0:
+            # Находим базовую цену
+            base_price = 0
+            for fish in FISHES:
+                if fish['name'] == fish_name:
+                    base_price = fish.get('price', 0)
+                    break
+        
+            if base_price > 0:
+                npc = NPC_SELLERS[npc_index % len(NPC_SELLERS)]
+                multiplier = npc['multiplier']
+
+                # Проверяем, предпочитает ли NPC эту рыбу
+                if fish_name in npc.get('preferred_fish', []):
+                    multiplier *= 1.5
+                    bonus_text = "\n🎉 *Бонус: Рыба предпочитаемая этим NPC!*"
+                else:
+                    bonus_text = ""
+            
+                total_price = int(base_price * count * multiplier)
+        
+                # Продаем
+                db.sell_fish(user.id, fish_name, count, npc_index)
+            
+                bot.answer_callback_query(call.id, f"✅ Продано {count} шт. {fish_name} за {total_price}р")
+            
+                text = (
+                    f"💰 *Продажа завершена!*\n\n"
+                    f"🐟 Продано: {fish_name}\n"
+                    f"📊 Количество: {count} шт.\n"
+                    f"💎 Базовая цена: {base_price}р за шт.\n"
+                    f"📈 Множитель NPC: x{multiplier}\n"
+                    f"💰 Получено: *{total_price} {COINS_NAME}*{bonus_text}\n\n"
+                    f"💰 Теперь у вас: {db.get_user(user.id)['coins']} {COINS_NAME}"
+                )
+            
+                bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode='Markdown')
+        else:
+            bot.answer_callback_query(call.id, "❌ Этой рыбы больше нет!")
+  
     # Если callback не обработан
     else:
         bot.answer_callback_query(call.id, "⚠️ Неизвестная команда")
+        print(f"Неизвестный callback: {call.data} от {user.id}")
 
 # ========== ТЕХПОДДЕРЖКА ==========
 
