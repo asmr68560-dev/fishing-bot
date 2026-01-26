@@ -6463,7 +6463,7 @@ def handle_media_messages(message):
     delete_links_in_group(message)
 
 # БАЗА ДАННЫХ
-db = UserDatabase
+db = UserDatabase()
 print(f"База данных создана, пользователей: {len(db.users)}")
 
 # ========== FLASK WEBHOOK СЕРВЕР ==========
