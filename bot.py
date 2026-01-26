@@ -51,10 +51,6 @@ ADMIN_LOG_FILE = 'admin_logs.json'
 ACTION_LOG_FILE = 'action_logs.json'
 NEWS_CHANNEL_ID = None  # ID канала для новостей (можно установить позже)
 
-# БАЗА ДАННЫХ
-db = UserDatabase
-print(f"База данных создана, пользователей: {len(db.users)}")
-
 # ========== ВОДОЕМЫ (10 реальных водоемов России) ==========
 WATER_BODIES = [
     {
@@ -1246,33 +1242,51 @@ class UserDatabase:
                     return transaction
         return None
 
-        # В класс UserDatabase добавь:
-
+    def save_user_to_file(self, user):
+        """Сохраняем пользователя в файл"""
+        try:
+           # Получаем user_id - ищем в разных местах
+            user_id = None
+        
+            # Сначала ищем 'id'
+            if 'id' in user:
+                user_id = str(user['id'])
+            # Ищем 'user_id'
+            elif 'user_id' in user:
+                user_id = str(user['user_id'])
+            # Если не нашли - ищем ключ в словаре пользователей
+            else:
+                for uid, user_data in self.users.items():
+                    if user_data == user:
+                        user_id = uid
+                        break
+        
+            if not user_id:
+                print("❌ Не удалось определить user_id для сохранения")
+                return False
+        
+            file_path = self.get_user_file_path(user_id)
+        
+            # Создаем папку если ее нет
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+            # Добавляем метку времени
+            user['last_saved'] = datetime.now().isoformat()
+        
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(user, f, ensure_ascii=False, indent=2)
+        
+            return True
+        except Exception as e:
+            print(f"❌ Ошибка сохранения пользователя {user_id}: {e}")
+            return False
+    
     def get_user_file_path(self, user_id):
         """Получаем путь к файлу пользователя"""
         user_id = str(user_id)
         return os.path.join("users_data", f"{user_id}.json")
 
-    def save_user_to_file(self, user):
-        """Сохраняем пользователя в файл"""
-        try:
-           user_id = str(user['id']) if 'id' in user else str(user.get('user_id', 'unknown'))
-           file_path = self.get_user_file_path(user_id)
-        
-           # Создаем папку если ее нет
-           os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        
-           # Добавляем метку времени
-           user['last_saved'] = datetime.now().isoformat()
-        
-           with open(file_path, 'w', encoding='utf-8') as f:
-               json.dump(user, f, ensure_ascii=False, indent=2)
-        
-           return True
-        except Exception as e:
-            print(f"❌ Ошибка сохранения пользователя {user_id}: {e}")
-            return False
-
+    
     def load_user_from_file(self, user_id):
         """Загружаем пользователя из файла"""
         try:
@@ -6447,6 +6461,10 @@ def handle_all_messages(message):
 @bot.message_handler(content_types=['photo', 'video', 'document', 'audio', 'voice', 'sticker'])
 def handle_media_messages(message):
     delete_links_in_group(message)
+
+# БАЗА ДАННЫХ
+db = UserDatabase
+print(f"База данных создана, пользователей: {len(db.users)}")
 
 # ========== FLASK WEBHOOK СЕРВЕР ==========
 # Создаем Flask приложение
