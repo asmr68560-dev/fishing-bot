@@ -295,16 +295,16 @@ BAITS = [
 # ========== УДОЧКИ РЕАЛЬНЫЕ ==========
 RODS = [
     # Поплавочные удочки
-    {"name": "🎣 Маховая удочка", "price": 300, "emoji": "🎣", "description": "Простая удочка для ловли с берега", "power": 1.0, "durability": 100, "max_fish_weight": 5, "type": "поплавочная", "luck": 1.0},
-    {"name": "🎣 Болонская удочка", "price": 800, "emoji": "🎣", "description": "Удочка с кольцами для дальнего заброса", "power": 1.2, "durability": 120, "max_fish_weight": 8, "type": "поплавочная", "luck": 1.1},
-    {"name": "🎣 Матчевая удочка", "price": 1500, "emoji": "🎣", "description": "Для ловли на дальних дистанциях", "power": 1.5, "durability": 150, "max_fish_weight": 12, "type": "поплавочная", "luck": 1.2},
+    {"name": "🎣 Маховая удочка", "price": 1000, "emoji": "🎣", "description": "Простая удочка для ловли с берега", "power": 1.0, "durability": 100, "max_fish_weight": 5, "type": "поплавочная", "luck": 1.0},
+    {"name": "🎣 Болонская удочка", "price": 2700, "emoji": "🎣", "description": "Удочка с кольцами для дальнего заброса", "power": 1.2, "durability": 120, "max_fish_weight": 8, "type": "поплавочная", "luck": 1.1},
+    {"name": "🎣 Матчевая удочка", "price": 6000, "emoji": "🎣", "description": "Для ловли на дальних дистанциях", "power": 1.5, "durability": 150, "max_fish_weight": 12, "type": "поплавочная", "luck": 1.2},
     {"name": "🎣 Штекерная удочка", "price": 3000, "emoji": "🎣", "description": "Профессиональная удочка для точной ловли", "power": 1.8, "durability": 180, "max_fish_weight": 15, "type": "поплавочная", "luck": 1.3},
     
     # Спиннинги
-    {"name": "🎣 Ультралайт спиннинг", "price": 2000, "emoji": "🎣", "description": "Для ловли мелкой хищной рыбы", "power": 1.4, "durability": 130, "max_fish_weight": 3, "type": "спиннинг", "luck": 1.4},
-    {"name": "🎣 Лайт спиннинг", "price": 3500, "emoji": "🎣", "description": "Универсальный спиннинг", "power": 1.7, "durability": 160, "max_fish_weight": 8, "type": "спиннинг", "luck": 1.5},
-    {"name": "🎣 Медиум спиннинг", "price": 5000, "emoji": "🎣", "description": "Для крупной хищной рыбы", "power": 2.0, "durability": 200, "max_fish_weight": 15, "type": "спиннинг", "luck": 1.6},
-    {"name": "🎣 Хеви спиннинг", "price": 8000, "emoji": "🎣", "description": "Для самой крупной рыбы", "power": 2.5, "durability": 250, "max_fish_weight": 30, "type": "спиннинг", "luck": 1.7},
+    {"name": "🎣 Ультралайт спиннинг", "price": 2500, "emoji": "🎣", "description": "Для ловли мелкой хищной рыбы", "power": 1.4, "durability": 130, "max_fish_weight": 3, "type": "спиннинг", "luck": 1.4},
+    {"name": "🎣 Лайт спиннинг", "price": 5000, "emoji": "🎣", "description": "Универсальный спиннинг", "power": 1.7, "durability": 160, "max_fish_weight": 8, "type": "спиннинг", "luck": 1.5},
+    {"name": "🎣 Медиум спиннинг", "price": 6000, "emoji": "🎣", "description": "Для крупной хищной рыбы", "power": 2.0, "durability": 200, "max_fish_weight": 15, "type": "спиннинг", "luck": 1.6},
+    {"name": "🎣 Хеви спиннинг", "price": 10000, "emoji": "🎣", "description": "Для самой крупной рыбы", "power": 2.5, "durability": 250, "max_fish_weight": 30, "type": "спиннинг", "luck": 1.7},
     {"name": "🎣 Карбоновый спиннинг", "price": 12000, "emoji": "🎣", "description": "Профессиональный спиннинг из карбона", "power": 3.0, "durability": 300, "max_fish_weight": 50, "type": "спиннинг", "luck": 1.8},
     
     # Фидерные удочки
@@ -319,7 +319,7 @@ RODS = [
     {"name": "🎣 Нахлыст 9 класс", "price": 15000, "emoji": "🎣", "description": "Для крупной рыбы", "power": 2.2, "durability": 220, "max_fish_weight": 15, "type": "нахлыст", "luck": 1.9},
     
     # Зимние удочки
-    {"name": "🎣 Зимняя удочка", "price": 500, "emoji": "❄️", "description": "Для зимней рыбалки", "power": 1.0, "durability": 80, "max_fish_weight": 2, "type": "зимняя", "luck": 1.2},
+    {"name": "🎣 Зимняя удочка", "price": 650, "emoji": "❄️", "description": "Для зимней рыбалки", "power": 1.0, "durability": 80, "max_fish_weight": 2, "type": "зимняя", "luck": 1.2},
     {"name": "🎣 Зимний спиннинг", "price": 1500, "emoji": "❄️", "description": "Спиннинг для зимней рыбалки", "power": 1.3, "durability": 100, "max_fish_weight": 5, "type": "зимняя", "luck": 1.3},
     {"name": "🎣 Зимняя жерлица", "price": 800, "emoji": "❄️", "description": "Для ловли хищника зимой", "power": 1.5, "durability": 120, "max_fish_weight": 10, "type": "зимняя", "luck": 1.4},
     {"name": "🎣 Балансирная удочка", "price": 1200, "emoji": "❄️", "description": "Для ловли на балансир", "power": 1.4, "durability": 110, "max_fish_weight": 6, "type": "зимняя", "luck": 1.3},
@@ -337,13 +337,13 @@ RODS = [
 
 # ========== УЛУЧШЕНИЯ ДЛЯ УДОЧЕК ==========
 ROD_UPGRADES = [
-    {"name": "🔧 Ремкомплект", "price": 500, "emoji": "🔧", "description": "Восстанавливает 50 прочности удочки", "effect": "repair_50"},
-    {"name": "⚙️ Качественная леска", "price": 1000, "emoji": "⚙️", "description": "+10% к прочности удочки", "effect": "durability_10"},
-    {"name": "💎 Прочные кольца", "price": 2000, "emoji": "💎", "description": "+20% к прочности удочки", "effect": "durability_20"},
+    {"name": "🔧 Ремкомплект", "price": 3500, "emoji": "🔧", "description": "Восстанавливает 50 прочности удочки", "effect": "repair_50"},
+    {"name": "⚙️ Качественная леска", "price": 1500, "emoji": "⚙️", "description": "+10% к прочности удочки", "effect": "durability_10"},
+    {"name": "💎 Прочные кольца", "price": 2500, "emoji": "💎", "description": "+20% к прочности удочки", "effect": "durability_20"},
     {"name": "🌟 Улучшенная рукоять", "price": 3000, "emoji": "🌟", "description": "+10% к удаче", "effect": "luck_10"},
     {"name": "✨ Магическая приманка", "price": 5000, "emoji": "✨", "description": "+20% к удаче", "effect": "luck_20"},
-    {"name": "🛡️ Нерушимость", "price": 10000, "emoji": "🛡️", "description": "Удочка никогда не ломается", "effect": "unbreakable"},
-    {"name": "🔮 Удача +30%", "price": 15000, "emoji": "🔮", "description": "Значительно увеличивает удачу", "effect": "luck_30"}
+    {"name": "🛡️ Нерушимость", "price": 25000, "emoji": "🛡️", "description": "Удочка никогда не ломается", "effect": "unbreakable"},
+    {"name": "🔮 Удача +30%", "price": 10000, "emoji": "🔮", "description": "Значительно увеличивает удачу", "effect": "luck_30"}
 ]
 
 # ========== ДОНАТ ПАКЕТЫ ==========
@@ -1044,41 +1044,53 @@ class UserDatabase:
         self.save_user_to_file(user)
         return True
     
-    def sell_fish(self, user_id, fish_name, count=1, npc_index=0):
-        user = self.get_user(user_id)
-        
+    def sell_fish(user_id, fish_name, count=1, npc_index=0):
+        """Продажа рыбы с учетом NPC и комиссии за неподходящую рыбу"""
+        user = db.get_user(user_id)
+    
         if fish_name not in user['inventory']['fish'] or user['inventory']['fish'][fish_name] < count:
-            return False, 0
-        
-        # Находим цену рыбы
-        fish_price = 0
-        for fish in FISHES:
-            if fish['name'] == fish_name:
-                fish_price = fish.get('price', 0)
-                fish_rarity = fish.get('rarity', "")
-                break
-        
-        if fish_price == 0:
-            return False, 0
-        
-        # Получаем NPC
+            return False, 0, "Нет такой рыбы"
+    
+    # Находим рыбу
+        fish_data = next((f for f in FISHES if f['name'] == fish_name), None)
+        if not fish_data:
+            return False, 0, "Рыба не найдена"
+    
+        base_price = fish_data.get('price', 0)
+        if base_price == 0:
+            return False, 0, "Рыба не продается"
+    
+    # Получаем NPC
         npc = NPC_SELLERS[npc_index % len(NPC_SELLERS)]
         multiplier = npc['multiplier']
-        
-        # Проверяем, предпочитает ли NPC эту рыбу
+    
+    # Проверяем, подходит ли рыба этому NPC
         preferred_fish = npc.get('preferred_fish', [])
+    
         if fish_name in preferred_fish:
-            multiplier *= 1.5  # Бонус за предпочитаемую рыбу
-        
-        total_price = int(fish_price * count * multiplier)
+        # Рыба предпочитаемая - бонус 50%
+            multiplier *= 1.5
+            commission = 0
+            commission_text = "✓ Рыба предпочитаемая (+50%)"
+        else:
+        # Рыба неподходящая - комиссия 70%
+            commission = 0.7  # 70%
+            multiplier *= (1 - commission)  # Оставляем 30% цены
+            commission_text = "⚠️ Неподходящая рыба (-70% комиссия)"
+    
+        total_price = int(base_price * count * multiplier)
+    
+    # Вычитаем рыбу
         user['inventory']['fish'][fish_name] -= count
         if user['inventory']['fish'][fish_name] == 0:
             del user['inventory']['fish'][fish_name]
-        
+    
+    # Добавляем деньги
         user['coins'] += total_price
         user['total_coins_earned'] = user.get('total_coins_earned', 0) + total_price
-        self.save_user_to_file(user)
-        return True, total_price
+    
+        db.save_user_to_file(user)
+        return True, total_price, commission_text
     
     def get_daily_quests(self, user_id):
         user = self.get_user(user_id)
@@ -1642,68 +1654,121 @@ def get_fish_for_bait(bait_name, location_fish):
     
     return suitable_fish
 
-def calculate_catch(user_data, bait_name=None):
+def calculate_catch_detailed(user_data, bait_name=None):
     """Расчет улова с учетом приманки, удочки и удачи"""
     current_location = user_data.get('current_location', 'Волга')
     location_fish = get_available_fish_for_location(current_location)
     
-    # Если указана приманка, выбираем рыбу для нее
+    # Если указана приманка, выбираем ТОЛЬКО подходящую рыбу
     if bait_name and bait_name != "🌱 Обычный червь":
-        suitable_fish = get_fish_for_bait(bait_name, location_fish)
-        if suitable_fish:
-            # Взвешенный выбор с учетом редкости
-            weighted_fish = []
-            for fish in suitable_fish:
-                weight = RARITY_PROBABILITIES.get(fish['rarity'], 1)
-                weighted_fish.extend([fish] * weight)
+        # Получаем рыбу для этой приманки
+        suitable_fish = []
+        for fish in location_fish:
+            if 'baits' not in fish or not fish['baits']:
+                continue
             
-            if weighted_fish:
-                selected_fish = random.choice(weighted_fish)
-            else:
-                selected_fish = random.choice(suitable_fish)
-        else:
-            selected_fish = random.choice(location_fish)
-    else:
-        # Случайный выбор с учетом вероятностей редкости
-        total_prob = sum(RARITY_PROBABILITIES.values())
-        rand_num = random.randint(1, total_prob)
-        current_prob = 0
+            # Проверяем совпадение приманки
+            bait_found = False
+            bait_lower = bait_name.lower()
+            
+            for fish_bait in fish['baits']:
+                # Упрощенная проверка (можно улучшить)
+                if any(word in bait_lower for word in fish_bait.lower().split()):
+                    bait_found = True
+                    break
+            
+            if bait_found:
+                suitable_fish.append(fish)
         
-        for rarity, prob in RARITY_PROBABILITIES.items():
-            current_prob += prob
-            if rand_num <= current_prob:
-                # Фильтруем рыбу по редкости и местоположению
-                fish_of_rarity = [f for f in location_fish if f['rarity'] == rarity]
-                if fish_of_rarity:
-                    selected_fish = random.choice(fish_of_rarity)
-                else:
-                    # Если нет рыбы такой редкости, берем обычную
-                    selected_fish = random.choice([f for f in location_fish if f['rarity'] == 'обычная'])
-                break
+        # Если нет подходящей рыбы, возвращаем случайную с пониженным шансом
+        if not suitable_fish:
+            suitable_fish = location_fish
+            # Шанс поймать рыбу с неподходящей приманкой ниже
+            if random.random() > 0.3:  # 70% шанс поймать мусор
+                return next((f for f in FISHES if f['rarity'] == 'мусор'), suitable_fish[0])
+    else:
+        suitable_fish = location_fish
     
-    # Учет удачи от удочки и улучшений
-    current_rod_name = user_data.get('current_rod', '🎣 Маховая удочка')
-    rod_data = next((r for r in RODS if r['name'] == current_rod_name), None)
+    # Взвешенный выбор с учетом редкости
+    weighted_fish = []
+    for fish in suitable_fish:
+        weight = RARITY_PROBABILITIES.get(fish['rarity'], 1)
+        weighted_fish.extend([fish] * weight)
     
-    luck_multiplier = 1.0
-    if rod_data:
-        luck_multiplier *= rod_data.get('luck', 1.0)
-    
-    # Бонус удачи от улучшений
-    luck_multiplier += user_data.get('luck_bonus', 0.0)
-    
-    # Шанс улучшить редкость
-    if random.random() < (luck_multiplier - 1.0) * 0.1:
-        # Пытаемся улучшить редкость
-        rarities = ['обычная', 'редкая', 'эпическая', 'легендарная']
-        current_index = rarities.index(selected_fish['rarity'])
-        if current_index < len(rarities) - 1:
-            # Ищем рыбу с лучшей редкостью
-            better_fish = [f for f in location_fish if f['rarity'] == rarities[current_index + 1]]
-            if better_fish:
-                selected_fish = random.choice(better_fish)
+    if not weighted_fish:
+        selected_fish = random.choice(suitable_fish) if suitable_fish else FISHES[0]
+    else:
+        selected_fish = random.choice(weighted_fish)
     
     return selected_fish
+
+def get_fish_for_bait_detailed(bait_name):
+    """Получает детальный список рыбы для конкретной приманки"""
+    # Находим приманку
+    bait_data = next((b for b in BAITS if b['name'] == bait_name), None)
+    if not bait_data:
+        return []
+    
+    suitable_fish = []
+    
+    for fish in FISHES:
+        if 'baits' not in fish or not fish['baits']:
+            continue
+        
+        # Проверяем совпадения
+        bait_type = bait_data['type']
+        bait_name_lower = bait_name.lower()
+        fish_baits = [b.lower() for b in fish['baits']]
+        
+        # Проверяем по типу
+        if bait_type in ['червь', 'мотыль', 'опарыш']:
+            # Для червей проверяем конкретные названия
+            for fish_bait in fish_baits:
+                if bait_type in fish_bait or any(word in bait_name_lower for word in bait_type.split()):
+                    suitable_fish.append({
+                        'name': fish['name'],
+                        'rarity': fish['rarity'],
+                        'price': fish.get('price', 0),
+                        'emoji': fish.get('emoji', '🐟'),
+                        'locations': fish.get('locations', [])
+                    })
+                    break
+        elif bait_type:
+            # Для других типов проверяем наличие похожих приманок
+            match_found = False
+            for fish_bait in fish_baits:
+                if bait_type.lower() in fish_bait.lower():
+                    match_found = True
+                    break
+                # Проверяем ключевые слова
+                keywords = {
+                    'мелкая рыба': ['рыба', 'малек', 'живец'],
+                    'кукуруза': ['кукуруза', 'зерно'],
+                    'горох': ['горох', 'бобовые'],
+                    'икра': ['икра', 'рыбья икра'],
+                    'мясо': ['мясо', 'фарш', 'кусочки']
+                }
+                for key, words in keywords.items():
+                    if bait_type == key:
+                        for word in words:
+                            if word in fish_bait:
+                                match_found = True
+                                break
+                    if match_found:
+                        break
+                if match_found:
+                    break
+            
+            if match_found:
+                suitable_fish.append({
+                    'name': fish['name'],
+                    'rarity': fish['rarity'],
+                    'price': fish.get('price', 0),
+                    'emoji': fish.get('emoji', '🐟'),
+                    'locations': fish.get('locations', [])
+                })
+    
+    return suitable_fish
 
 def create_main_keyboard(user_id=None):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
@@ -3936,13 +4001,11 @@ def backup_command(message):
         bot.edit_message_text("❌ Ошибка создания бэкапа", message.chat.id, msg.message_id)
 
 # ========== АДМИНСКИЕ КОМАНДЫ ДЛЯ ТЕХПОДДЕРЖКИ ==========
-
 @bot.message_handler(commands=['тикеты', 'tickets'])
 def show_tickets_command(message):
-    """Показать все обращения (только админы 5 уровня)"""
+    """Показать все обращения с пагинацией"""
     user = message.from_user
     
-    # Проверяем что это админ 5 уровня
     if not is_admin(user.id, 5):
         bot.send_message(message.chat.id, "❌ Эта команда только для админов 5 уровня!")
         return
@@ -3954,40 +4017,68 @@ def show_tickets_command(message):
         bot.send_message(message.chat.id, "📋 Обращений в техподдержку нет.")
         return
     
-    # Считаем сколько тикетов каждого статуса
+    # Сортируем по дате (последние сначала)
+    tickets.sort(key=lambda x: x['created_at'], reverse=True)
+    
+    # Разделяем по статусам
+    all_tickets = tickets
     open_tickets = [t for t in tickets if t['status'] == 'open']
     answered_tickets = [t for t in tickets if t['status'] == 'answered']
     closed_tickets = [t for t in tickets if t['status'] == 'closed']
     
-    # Формируем ответ
-    text = (
-        f"📋 *Статистика обращений*\n\n"
-        f"🟢 Открытые: {len(open_tickets)}\n"
-        f"🟡 Отвеченные: {len(answered_tickets)}\n"
-        f"🔴 Закрытые: {len(closed_tickets)}\n"
-        f"📊 Всего: {len(tickets)}\n\n"
-    )
+    # Создаем инлайн-клавиатуру
+    markup = types.InlineKeyboardMarkup(row_width=3)
     
-    # Показываем последние 3 открытых тикета
-    if open_tickets:
-        text += "🟢 *ПОСЛЕДНИЕ ОТКРЫТЫЕ:*\n\n"
+    # Кнопки фильтров
+    btn_all = types.InlineKeyboardButton(f'📋 Все ({len(all_tickets)})', callback_data='tickets_filter_all_0')
+    btn_open = types.InlineKeyboardButton(f'🟢 Открытые ({len(open_tickets)})', callback_data='tickets_filter_open_0')
+    btn_answered = types.InlineKeyboardButton(f'🟡 Отвеченные ({len(answered_tickets)})', callback_data='tickets_filter_answered_0')
+    btn_closed = types.InlineKeyboardButton(f'🔴 Закрытые ({len(closed_tickets)})', callback_data='tickets_filter_closed_0')
+    
+    markup.add(btn_all, btn_open, btn_answered, btn_closed)
+    
+    # Показываем первую страницу всех тикетов
+    text = format_tickets_page(all_tickets, 0, "Все тикеты")
+    
+    bot.send_message(message.chat.id, text, reply_markup=markup, parse_mode='Markdown')
+
+def format_tickets_page(tickets, page, filter_name):
+    """Форматирует страницу тикетов"""
+    tickets_per_page = 5
+    start_idx = page * tickets_per_page
+    end_idx = start_idx + tickets_per_page
+    page_tickets = tickets[start_idx:end_idx]
+    
+    text = f"📋 *{filter_name}*\n\n"
+    text += f"📊 Страница {page + 1}/{(len(tickets) + tickets_per_page - 1) // tickets_per_page}\n\n"
+    
+    if not page_tickets:
+        text += "❌ Тикетов нет\n"
+        return text
+    
+    for ticket in page_tickets:
+        status_emoji = "🟢" if ticket['status'] == 'open' else "🟡" if ticket['status'] == 'answered' else "🔴"
+        status_text = "Открыто" if ticket['status'] == 'open' else "Отвечено" if ticket['status'] == 'answered' else "Закрыто"
         
-        # Берем последние 3 открытых тикета
-        for ticket in open_tickets[-3:][::-1]:
-            # Получаем данные пользователя
-            user_data = db.get_user(ticket['user_id'])
-            user_name = user_data.get('first_name', 'Неизвестно')
-            
-            # Форматируем дату
-            date = datetime.fromisoformat(ticket['created_at']).strftime("%d.%m %H:%M")
-            
-            text += f"🔸 *Тикет #{ticket['id']}*\n"
-            text += f"👤 {user_name} (ID: {ticket['user_id']})\n"
-            text += f"📅 {date}\n"
-            text += f"💬 {ticket['message'][:50]}...\n"
-            text += f"📤 Для ответа: `/ответить {ticket['id']} ваш текст`\n\n"
+        # Получаем данные пользователя
+        user_data = db.get_user(ticket['user_id'])
+        user_name = user_data.get('first_name', 'Неизвестно') if user_data else 'Неизвестно'
+        
+        date = datetime.fromisoformat(ticket['created_at']).strftime("%d.%m %H:%M")
+        
+        text += f"{status_emoji} *Тикет #{ticket['id']}*\n"
+        text += f"👤 {user_name} (ID: {ticket['user_id']})\n"
+        text += f"📅 {date} | {status_text}\n"
+        text += f"💬 {ticket['message'][:50]}...\n"
+        
+        if ticket['reply']:
+            admin_data = db.get_user(ticket['admin_id']) if ticket['admin_id'] else None
+            admin_name = admin_data.get('first_name', 'Администратор') if admin_data else 'Администратор'
+            text += f"📤 Ответил: {admin_name}\n"
+        
+        text += "─" * 30 + "\n\n"
     
-    bot.send_message(message.chat.id, text)
+    return text
 
 @bot.message_handler(commands=['ответить', 'answer'])
 def answer_ticket_command(message):
@@ -4834,6 +4925,44 @@ def callback_handler(call):
                             parse_mode='Markdown')
         return
     
+    # В callback_handler добавляем обработку покупки удочек
+    elif call.data.startswith('buy_rod_'):
+        try:
+            rod_index = int(call.data.split('_')[-1])
+            if 0 <= rod_index < len(RODS):
+                rod = RODS[rod_index]
+                user_data = db.get_user(user.id)
+            
+                if user_data['coins'] >= rod['price']:
+                # Покупаем удочку
+                    success, new_balance = db.remove_coins(user.id, rod['price'])
+                    if success:
+                    # Добавляем удочку
+                        db.add_rod(user.id, rod['name'])
+                    
+                        text = f"✅ *Удочка куплена!*\n\n"
+                        text += f"🎣 {rod['emoji']} {rod['name']}\n"
+                        text += f"📝 {rod['description']}\n"
+                        text += f"💪 Мощность: {rod['power']}x\n"
+                        text += f"⚖️ Макс. вес: {rod['max_fish_weight']}кг\n"
+                        text += f"🍀 Удача: +{int((rod['luck']-1)*100)}%\n"
+                        text += f"💰 Стоимость: {rod['price']} {COINS_NAME}\n"
+                        text += f"💰 Новый баланс: {new_balance} {COINS_NAME}\n\n"
+                        text += f"🎣 Удочка добавлена в инвентарь!"
+                    
+                        bot.edit_message_text(text,
+                                            call.message.chat.id,
+                                            call.message.message_id,
+                                            parse_mode='Markdown')
+                        bot.answer_callback_query(call.id, f"✅ Куплено: {rod['name']}")
+                    else:
+                        bot.answer_callback_query(call.id, "❌ Ошибка при покупке")
+                else:
+                    bot.answer_callback_query(call.id, f"❌ Недостаточно {COINS_NAME}! Нужно {rod['price']}, у вас {user_data['coins']}")
+        except Exception as e:
+            bot.answer_callback_query(call.id, f"❌ Ошибка: {e}")
+        return
+    
     elif call.data == 'back_to_shop':
         # Возврат в меню магазина
         shop_command(bot.send_message(call.message.chat.id, "."))
@@ -4978,44 +5107,40 @@ def callback_handler(call):
         return
     
     # ========== ПРОДАЖА РЫБЫ ==========
-    elif call.data.startswith('sell_npc_'):
+    elif call.data.startswith('sell_fish_'):
         try:
-            npc_index = int(call.data.split('_')[-1])
+            parts = call.data.split('_')
+            fish_name = '_'.join(parts[2:-1])
+            npc_index = int(parts[-1])
+        
             user_data = db.get_user(user.id)
+            count = user_data['inventory']['fish'].get(fish_name, 0)
+        
+            if count > 0:
+            # Продаем всю рыбу этого типа
+                success, price, commission_text = sell_fish(user.id, fish_name, count, npc_index)
             
-            if not user_data['inventory']['fish']:
-                bot.answer_callback_query(call.id, "❌ У вас нет рыбы для продажи!")
-                return
-            
-            npc = NPC_SELLERS[npc_index % len(NPC_SELLERS)]
-            total_earned = 0
-            sold_fish = []
-            
-            # Продаем всю рыбу
-            for fish_name, count in list(user_data['inventory']['fish'].items()):
-                success, price = db.sell_fish(user.id, fish_name, count, npc_index)
                 if success:
-                    total_earned += price
-                    sold_fish.append(f"{fish_name} x{count}")
-            
-            if total_earned > 0:
-                text = f"💰 *Рыба продана!*\n\n"
-                text += f"👨‍🌾 Покупатель: {npc['emoji']} {npc['name']}\n"
-                text += f"📝 {npc['description']}\n\n"
-                text += f"🐟 *Продано:*\n"
-                for fish in sold_fish:
-                    text += f"• {fish}\n"
-                text += f"\n💰 *Заработано:* {total_earned} {COINS_NAME}\n"
-                text += f"💰 *Новый баланс:* {user_data['coins']} {COINS_NAME}"
+                    npc = NPC_SELLERS[npc_index]
                 
-                bot.edit_message_text(text,
-                                    call.message.chat.id,
-                                    call.message.message_id,
-                                    parse_mode='Markdown')
-                bot.answer_callback_query(call.id, f"✅ Продано на {total_earned} {COINS_NAME}")
+                    text = f"💰 *Рыба продана!*\n\n"
+                    text += f"👨‍🌾 Покупатель: {npc['emoji']} {npc['name']}\n"
+                    text += f"📝 {npc['description']}\n\n"
+                    text += f"🐟 Продано: {fish_name} x{count}\n"
+                    text += f"📊 {commission_text}\n\n"
+                    text += f"💰 Заработано: {price} {COINS_NAME}\n"
+                    text += f"💰 Новый баланс: {user_data['coins']} {COINS_NAME}"
+                
+                    bot.edit_message_text(text,
+                                        call.message.chat.id,
+                                        call.message.message_id,
+                                        parse_mode='Markdown')
+                    bot.answer_callback_query(call.id, f"✅ Продано на {price} {COINS_NAME}")
+                else:
+                    bot.answer_callback_query(call.id, "❌ Ошибка при продаже")
             else:
-                bot.answer_callback_query(call.id, "❌ Не удалось продать рыбу")
-                
+                bot.answer_callback_query(call.id, "❌ Рыба уже продана")
+            
         except Exception as e:
             bot.answer_callback_query(call.id, f"❌ Ошибка: {e}")
         return
@@ -5107,23 +5232,42 @@ def callback_handler(call):
             if 0 <= bait_index < len(BAITS):
                 bait = BAITS[bait_index]
                 user_data = db.get_user(user.id)
-                
+            
                 if user_data['coins'] >= bait['price']:
                     # Покупаем
                     success, new_balance = db.remove_coins(user.id, bait['price'])
                     if success:
                         db.add_bait(user.id, bait['name'], 1)
-                        
+                    
+                    # Узнаем для какой рыбы подходит приманка
+                        suitable_fish = []
+                        for fish in FISHES:
+                            if 'baits' in fish:
+                                bait_lower = bait['name'].lower()
+                                for fish_bait in fish.get('baits', []):
+                                    if bait['type'].lower() in fish_bait.lower() or any(word in bait_lower for word in bait['type'].split()):
+                                        suitable_fish.append(fish['name'])
+                                        break
+                    
                         text = f"✅ *Приманка куплена!*\n\n"
                         text += f"🪱 {bait['emoji']} {bait['name']}\n"
                         text += f"📝 {bait['description']}\n"
                         text += f"💰 Стоимость: {bait['price']} {COINS_NAME}\n"
                         text += f"💰 Новый баланс: {new_balance} {COINS_NAME}\n\n"
-                        text += f"🎣 Приманка добавлена в инвентарь!"
-                        
+                        text += f"🎣 *Используется с червяками!*\n"
+                        text += f"🐛 Тратится 1 червяк на рыбалку\n\n"
+                    
+                        if suitable_fish:
+                            text += f"🐟 *Подходит для рыбы:*\n"
+                            for fish_name in suitable_fish[:5]:  # Показываем первые 5
+                                text += f"• {fish_name}\n"
+                            if len(suitable_fish) > 5:
+                                text += f"• и еще {len(suitable_fish)-5} видов...\n"
+                    
                         bot.edit_message_text(text,
                                             call.message.chat.id,
-                                            call.message.message_id,parse_mode='Markdown')
+                                            call.message.message_id,
+                                            parse_mode='Markdown')
                         bot.answer_callback_query(call.id, f"✅ Куплено: {bait['name']}")
                     else:
                         bot.answer_callback_query(call.id, "❌ Ошибка при покупке")
@@ -5133,34 +5277,89 @@ def callback_handler(call):
             bot.answer_callback_query(call.id, f"❌ Ошибка: {e}")
         return
     
-    elif call.data.startswith('buy_worms_'):
+        # В callback_handler добавляем:
+    elif call.data.startswith('tickets_filter_'):
         try:
-            count = int(call.data.split('_')[-1])
-            total_price = WORM_PRICE * count
-            user_data = db.get_user(user.id)
-            
-            if user_data['coins'] >= total_price:
-                # Покупаем червяков
-                success, new_balance = db.remove_coins(user.id, total_price)
-                if success:
-                    user_data['worms'] = min(MAX_WORMS, user_data['worms'] + count)
-                    db.save_data()
-                    
-                    text = f"✅ *Червяки куплены!*\n\n"
-                    text += f"🐛 Куплено: {count} червяков\n"
-                    text += f"💰 Стоимость: {total_price} {COINS_NAME}\n"
-                    text += f"💰 Новый баланс: {new_balance} {COINS_NAME}\n"
-                    text += f"🐛 Теперь у вас: {user_data['worms']}/10 червяков"
-                    
-                    bot.edit_message_text(text,
-                                        call.message.chat.id,
-                                        call.message.message_id,
-                                        parse_mode='Markdown')
-                    bot.answer_callback_query(call.id, f"✅ Куплено {count} червяков")
-                else:
-                    bot.answer_callback_query(call.id, "❌ Ошибка при покупке")
+            parts = call.data.split('_')
+            filter_type = parts[2]  # all, open, answered, closed
+            page = int(parts[3])
+       
+            # Получаем все тикеты
+            all_tickets = db.support_tickets
+            all_tickets.sort(key=lambda x: x['created_at'], reverse=True)
+        
+        # Фильтруем по типу
+            if filter_type == 'all':
+                tickets = all_tickets
+                filter_name = "Все тикеты"
+            elif filter_type == 'open':
+                tickets = [t for t in all_tickets if t['status'] == 'open']
+                filter_name = "Открытые тикеты"
+            elif filter_type == 'answered':
+                tickets = [t for t in all_tickets if t['status'] == 'answered']
+                filter_name = "Отвеченные тикеты"
+            elif filter_type == 'closed':
+                tickets = [t for t in all_tickets if t['status'] == 'closed']
+                filter_name = "Закрытые тикеты"
             else:
-                bot.answer_callback_query(call.id, f"❌ Недостаточно {COINS_NAME}")
+                tickets = all_tickets
+                filter_name = "Все тикеты"
+        
+        # Проверяем границы страниц
+            tickets_per_page = 5
+            max_page = (len(tickets) + tickets_per_page - 1) // tickets_per_page - 1
+            if page < 0:
+                page = 0
+            if page > max_page:
+                page = max_page
+        
+            # Формируем текст
+            text = format_tickets_page(tickets, page, filter_name)
+        
+            # Создаем клавиатуру с пагинацией
+            markup = types.InlineKeyboardMarkup(row_width=5)
+        
+        # Кнопки фильтров
+            btn_all = types.InlineKeyboardButton(f'Все ({len(all_tickets)})', 
+                                               callback_data=f'tickets_filter_all_{page}')
+            btn_open = types.InlineKeyboardButton(f'🟢 ({len([t for t in all_tickets if t["status"] == "open"])})', 
+                                                callback_data=f'tickets_filter_open_{page}')
+            btn_answered = types.InlineKeyboardButton(f'🟡 ({len([t for t in all_tickets if t["status"] == "answered"])})', 
+                                                    callback_data=f'tickets_filter_answered_{page}')
+            btn_closed = types.InlineKeyboardButton(f'🔴 ({len([t for t in all_tickets if t["status"] == "closed"])})', 
+                                                  callback_data=f'tickets_filter_closed_{page}')
+        
+            markup.add(btn_all, btn_open, btn_answered, btn_closed)
+        
+        # Кнопки пагинации
+            pagination_row = []
+            if page > 0:
+                pagination_row.append(types.InlineKeyboardButton('⬅️ Назад', 
+                                                               callback_data=f'tickets_filter_{filter_type}_{page-1}'))
+        
+            pagination_row.append(types.InlineKeyboardButton(f'{page+1}/{max_page+1}', 
+                                                           callback_data='tickets_page_info'))
+        
+            if page < max_page:
+                pagination_row.append(types.InlineKeyboardButton('Вперед ➡️', 
+                                                               callback_data=f'tickets_filter_{filter_type}_{page+1}'))
+        
+            markup.add(*pagination_row)
+        
+        # Кнопки действий
+            action_row = []
+            action_row.append(types.InlineKeyboardButton('📝 Просмотреть тикет', 
+                                                       callback_data='tickets_view_select'))
+            action_row.append(types.InlineKeyboardButton('📋 В админку', 
+                                                       callback_data='menu'))
+            markup.add(*action_row)
+        
+            bot.edit_message_text(text,
+                                call.message.chat.id,
+                                call.message.message_id,
+                                reply_markup=markup,
+                                parse_mode='Markdown')
+        
         except Exception as e:
             bot.answer_callback_query(call.id, f"❌ Ошибка: {e}")
         return
