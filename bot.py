@@ -4552,7 +4552,12 @@ def admin_all_logs_handler(message):
     
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
+    print(f"Callback получен: {call.data} от {call.from_user.id}")
     user = call.from_user
+
+    if call.data == 'tets_button':
+        bot.answer_callback_query(call.id, "Тестовая кнопка работает!")
+        return
     
     # ========== КНОПКИ ДЛЯ НОВЫХ ПОЛЬЗОВАТЕЛЕЙ ==========
     if call.data == 'first_time_start_command':
@@ -6462,9 +6467,37 @@ def handle_all_messages(message):
 def handle_media_messages(message):
     delete_links_in_group(message)
 
-# БАЗА ДАННЫХ
+@bot.message_handler(commands=['test'])
+def test_command(message):
+    """Тестовая команда для проверки кнопок"""
+    user = message.from_user
+    
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    
+    # Тестовая кнопка
+    btn_test = types.InlineKeyboardButton('🧪 Тест', callback_data='test_button')
+    
+    # Кнопки магазина
+    btn_shop = types.InlineKeyboardButton('🛒 Магазин', callback_data='shop_baits')
+    
+    # Кнопки топа
+    btn_top = types.InlineKeyboardButton('🏆 Топ', callback_data='top_coins')
+    
+    # Кнопки настроек
+    btn_settings = types.InlineKeyboardButton('⚙️ Настройки', callback_data='settings_change_nickname')
+    
+    markup.add(btn_test, btn_shop, btn_top, btn_settings)
+    
+    bot.send_message(
+        message.chat.id,
+        "🧪 *Тестовое меню*\n\nНажмите кнопки для проверки:",
+        reply_markup=markup,
+        parse_mode='Markdown'
+    )
+
+# ========== СОЗДАЕМ БАЗУ ДАННЫХ ==========
 db = UserDatabase()
-print(f"База данных создана, пользователей: {len(db.users)}")
+print(f"✅ База данных создана, пользователей: {len(db.users)}")
 
 # ========== FLASK WEBHOOK СЕРВЕР ==========
 # Создаем Flask приложение
